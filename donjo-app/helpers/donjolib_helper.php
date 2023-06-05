@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -176,9 +176,9 @@ function rp($inp = 0)
     return number_format($inp, 2, ',', '.');
 }
 
-function rupiah24($angka)
+function rupiah24($angka, $prefix = 'Rp ', $digit = 2)
 {
-    return 'Rp ' . number_format($angka, 2, ',', '.');
+    return $prefix . number_format($angka, $digit, ',', '.');
 }
 
 function jecho($a, $b, $str)
@@ -487,32 +487,6 @@ function get_identitas()
     $string = ucwords($ci->setting->sebutan_desa) . ' : ' . $hsl['nama_desa'] . ' ' . ucwords($ci->setting->sebutan_kecamatan_singkat) . ' : ' . $hsl['nama_kecamatan'] . ' Kab : ' . $hsl['nama_kabupaten'];
 
     return $string;
-}
-
-// fix str aneh utk masuk ke db
-// TODO: Jangan pernah gunakan saya lagi bro,,,,,, :p
-function fixSQL($str, $encode_ent = false)
-{
-    $str = @trim($str);
-    if ($encode_ent) {
-        $str = htmlentities($str);
-    }
-
-    if (version_compare(PHP_VERSION, '4.3.0') >= 0) {
-        if (get_magic_quotes_gpc()) {
-            $str = stripslashes($str);
-        }
-        // FIXME
-        if (function_exists('mysql_ping') && @mysql_ping()) {
-            $str = mysql_real_escape_string($str);
-        } else {
-            $str = addslashes($str);
-        }
-    } elseif (! get_magic_quotes_gpc()) {
-        $str = addslashes($str);
-    }
-
-    return $str;
 }
 
 //baca data tanpa HTML Tags

@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -37,10 +37,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Traits\Author;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
-class Penduduk extends Model
+defined('BASEPATH') || exit('No direct script access allowed');
+
+class Penduduk extends BaseModel
 {
+    use Author;
+
     /**
      * Static data tempat lahir.
      *
@@ -96,6 +103,14 @@ class Penduduk extends Model
     /**
      * {@inheritDoc}
      */
+    protected $appends = [
+        'usia',
+        'alamat_wilayah',
+    ];
+
+    /**
+     * {@inheritDoc}
+     */
     protected $with = [
         'jenisKelamin',
         'agama',
@@ -106,6 +121,7 @@ class Penduduk extends Model
         'cacat',
         'statusKawin',
         'pendudukStatus',
+        'wilayah',
     ];
 
     /**
@@ -130,6 +146,26 @@ class Penduduk extends Model
     public function mandiri()
     {
         return $this->hasOne(PendudukMandiri::class, 'id_pend');
+    }
+
+    /**
+     * Define a one-to-one relationship.
+     *
+     * @return HasOne
+     */
+    public function kia_ibu()
+    {
+        return $this->hasOne(KIA::class, 'ibu_id');
+    }
+
+    /**
+     * Define a one-to-one relationship.
+     *
+     * @return HasOne
+     */
+    public function kia_anak()
+    {
+        return $this->hasOne(KIA::class, 'anak_id');
     }
 
     /**
@@ -277,9 +313,19 @@ class Penduduk extends Model
      *
      * @return BelongsTo
      */
-    public function clusterDesa()
+    public function rtm()
     {
-        return $this->belongsTo(ClusterDesa::class, 'id_cluster')->withDefault();
+        return $this->belongsTo(Rtm::class, 'id_rtm', 'no_kk')->withDefault();
+    }
+
+    /**
+     * Define an inverse one-to-one or many relationship.
+     *
+     * @return BelongsTo
+     */
+    public function Wilayah()
+    {
+        return $this->belongsTo(Wilayah::class, 'id_cluster');
     }
 
     /**
@@ -403,5 +449,49 @@ class Penduduk extends Model
             ->orWhereNotNull('email')
             ->orWhereNotNull('telegram')
             ->status();
+    }
+
+    /**
+     * Scope query untuk menyaring data penduduk berdasarkan parameter yang ditentukan
+     *
+     * @param Builder $query
+     * @param mixed   $value
+     *
+     * @return Builder
+     */
+    public function scopefilters($query, array $filters = [])
+    {
+        foreach ($filters as $key => $value) {
+            $query->when($value ?? false, static function ($query) use ($value, $key) {
+                $query->where($key, $value);
+            });
+        }
+
+        return $query;
+    }
+
+    public function getUsiaAttribute()
+    {
+        $tglSekarang = Carbon::now();
+        $tglLahir    = Carbon::parse($this->tanggallahir);
+
+        return $tglLahir->diffInYears($tglSekarang) . ' Tahun';
+    }
+
+    public function getUmurAttribute()
+    {
+        $tglSekarang = Carbon::now();
+        $tglLahir    = Carbon::parse($this->tanggallahir);
+
+        return $tglLahir->diffInYears($tglSekarang);
+    }
+
+    public function getAlamatWilayahAttribute()
+    {
+        if (! in_array($this->id_kk, [0, null])) {
+            return $this->keluarga->alamat . ' RT ' . $this->keluarga->wilayah->rt . ' / RW ' . $this->keluarga->wilayah->rw . ' ' . ucwords(setting('sebutan_dusun') . ' ' . $this->keluarga->wilayah->dusun);
+        }
+
+        return $this->alamat_sekarang . ' RT ' . $this->wilayah->rt . ' / RW ' . $this->wilayah->rw . ' ' . ucwords(setting('sebutan_dusun') . ' ' . $this->wilayah->dusun);
     }
 }

@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -120,7 +120,7 @@ class Daftar_kontak extends Admin_Controller
         if ($id) {
             $action       = 'Ubah';
             $formAction   = route('daftar_kontak.update', $id);
-            $daftarKontak = DaftarKontak::find($id) ?? show_404();
+            $daftarKontak = DaftarKontak::findOrFail($id);
         } else {
             $action       = 'Tambah';
             $formAction   = route('daftar_kontak.insert');
@@ -137,7 +137,7 @@ class Daftar_kontak extends Admin_Controller
         $navigasi     = 'Penduduk';
         $action       = 'Ubah';
         $formAction   = route('daftar_kontak.update_penduduk', $id);
-        $daftarKontak = Penduduk::find($id) ?? show_404();
+        $daftarKontak = Penduduk::findOrFail($id);
 
         return view('admin.daftar_kontak.form', compact('title', 'navigasi', 'action', 'formAction', 'daftarKontak'));
     }
@@ -156,7 +156,7 @@ class Daftar_kontak extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        $data = DaftarKontak::find($id) ?? show_404();
+        $data = DaftarKontak::findOrFail($id);
 
         if ($data->update(static::validate($this->request))) {
             redirect_with('success', 'Berhasil Ubah Data');
@@ -168,7 +168,7 @@ class Daftar_kontak extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        $data = Penduduk::find($id) ?? show_404();
+        $data = Penduduk::findOrFail($id);
 
         if ($data->update(static::validate($this->request))) {
             redirect_with('success', 'Berhasil Ubah Data', 'daftar_kontak/penduduk');

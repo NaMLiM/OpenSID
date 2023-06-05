@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -244,17 +244,23 @@ class Web_dokumen_model extends MY_Model
         $this->list_data_sql($kat);
 
         switch ($o) {
-            case 1: $order = ' nama'; break;
+            case 1: $order = ' nama';
+                break;
 
-            case 2: $order = ' nama DESC'; break;
+            case 2: $order = ' nama DESC';
+                break;
 
-            case 3: $order = ' enabled'; break;
+            case 3: $order = ' enabled';
+                break;
 
-            case 4: $order = ' enabled DESC'; break;
+            case 4: $order = ' enabled DESC';
+                break;
 
-            case 5: $order = ' tgl_upload'; break;
+            case 5: $order = ' tgl_upload';
+                break;
 
-            case 6: $order = ' tgl_upload DESC'; break;
+            case 6: $order = ' tgl_upload DESC';
+                break;
 
             default:$order = ' id';
         }
@@ -301,66 +307,23 @@ class Web_dokumen_model extends MY_Model
 
     private function upload_dokumen($data, $file_lama = '')
     {
-        $satuan     = $_POST['satuan'];
-        $old_satuan = $_POST['old_satuan'];
+        $satuan                  = $_POST['satuan'];
+        $old_satuan              = $_POST['old_satuan'];
+        $filename                = $_FILES['satuan']['name'];
+        $ext                     = get_extension($filename);
+        $nama_file               = str_replace(".{$nama_akhiran}", '', $filename);
+        $nama_file               = bersihkan_namafile(substr($nama_file, 0, 180) . ".{$ext}");
+        $config['upload_path']   = LOKASI_DOKUMEN;
+        $config['allowed_types'] = 'gif|jpg|png|jpeg';
+        $config['file_name']     = $nama_file;
 
-        if ($_FILES['satuan']['tmp_name']) {
-            $_SESSION['error_msg'] = '';
-            $_SESSION['success']   = 1;
-            unset($data['old_file']);
-            if (empty($_FILES['satuan']['tmp_name']) || (int) $_FILES['satuan']['size'] > convertToBytes(max_upload() . 'MB')) {
-                session_error(' -> Error upload file. Periksa apakah melebihi ukuran maksimum');
+        $this->load->library('MY_Upload', null, 'upload');
+        $this->upload->initialize($config);
 
-                return null;
-            }
+        if (! $this->upload->do_upload('satuan')) {
+            session_error($this->upload->display_errors());
 
-            $lokasi_file = $_FILES['satuan']['tmp_name'];
-            if (empty($lokasi_file)) {
-                $_SESSION['success'] = -1;
-
-                return null;
-            }
-            if (function_exists('finfo_open')) {
-                $finfo     = finfo_open(FILEINFO_MIME_TYPE);
-                $tipe_file = finfo_file($finfo, $lokasi_file);
-            } else {
-                $tipe_file = $_FILES['satuan']['type'];
-            }
-            $nama_file = $_FILES['satuan']['name'];
-            $nama_file = str_replace(' ', '-', $nama_file); 	 // normalkan nama file
-            $ext       = get_extension($nama_file);
-
-            if (! in_array($tipe_file, $this->semua_mime_type()) || ! in_array($ext, $this->semua_ext())) {
-                session_error(' -> Jenis file salah: ' . $tipe_file . ' ' . $ext);
-
-                return null;
-            }
-            if (isPHP($lokasi_file, $nama_file)) {
-                session_error(' -> File berisi script');
-
-                return null;
-            }
-
-            $nama = $data['nama'];
-            if (! empty($data['id_pend'])) {
-                $nama_file = $data['id_pend'] . '_' . $nama . '_' . generator(6) . '_' . $nama_file;
-            } else {
-                $nama_file = $nama . '_' . generator(6) . '_' . $nama_file;
-            }
-            $nama_file = bersihkan_namafile($nama_file);
-            UploadDocument($nama_file, $file_lama);
-        } elseif ($satuan) {
-            if (! preg_match('/data:image\\/\\png/i', $satuan)) {
-                session_error(' -> File tidak diperbolehkan');
-
-                return null;
-            }
-
-            $nama_file = $nama_file = $data['id_pend'] . '_' . $data['nama'] . '_' . generator(6) . '.png';
-            $satuan    = str_replace('data:image/png;base64,', '', $satuan);
-            $satuan    = base64_decode($satuan, true);
-
-            file_put_contents(LOKASI_DOKUMEN . $nama_file, $satuan);
+            return false;
         }
 
         if ($old_satuan != '') {
@@ -378,9 +341,12 @@ class Web_dokumen_model extends MY_Model
         $data   = $this->validasi($post);
         if (! empty($post['satuan'])) {
             $data['satuan'] = $result = $this->upload_dokumen($post);
+            if ($result == false) {
+                return false;
+            }
         }
 
-        if ($result === null) {
+        if ($result === null && $data['tipe'] == 1) {
             return false;
         }
 
@@ -405,7 +371,7 @@ class Web_dokumen_model extends MY_Model
         return $retval;
     }
 
-    private function validasi($post)
+    private function validasi($post, $id = null)
     {
         $data                         = [];
         $data['nama']                 = nomor_surat_keputusan($post['nama']);
@@ -413,6 +379,12 @@ class Web_dokumen_model extends MY_Model
         $data['kategori_info_publik'] = $post['kategori_info_publik'] ?: null;
         $data['id_syarat']            = $post['id_syarat'] ?: null;
         $data['id_pend']              = $post['id_pend'] ?: 0;
+        $data['tipe']                 = $post['tipe'];
+        $data['url']                  = $post['url'] ?: null;
+
+        if ($data['tipe'] == 1) {
+            $data['url'] = null;
+        }
 
         switch ($data['kategori']) {
             case 1: //Informsi Publik
@@ -461,7 +433,7 @@ class Web_dokumen_model extends MY_Model
         $retval = true;
 
         $post = $this->input->post();
-        $data = $this->validasi($post);
+        $data = $this->validasi($post, $id);
         // Jangan simpan dok_warga kalau dari Layanan Mandiri
         if (! $mandiri) {
             ! $data['dok_warga'] = isset($post['dok_warga']);
@@ -703,9 +675,9 @@ class Web_dokumen_model extends MY_Model
                     // Informasi publik
                     $this->db->where('tahun', $tahun);
                     break;
-                // Data tanggal berbeda menurut kategori dokumen
-                // Informasi masing2 kategori dokumen tersimpan dalam format json di kolom attr
-                // MySQL baru memiliki fitur query json mulai dari 5.7; jadi di sini dilakukan secara manual
+                    // Data tanggal berbeda menurut kategori dokumen
+                    // Informasi masing2 kategori dokumen tersimpan dalam format json di kolom attr
+                    // MySQL baru memiliki fitur query json mulai dari 5.7; jadi di sini dilakukan secara manual
                 case '2':
                     // SK KADES
                     $regex = '"tgl_kep_kades":"[[:digit:]]{2}-[[:digit:]]{2}-' . $tahun;

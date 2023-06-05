@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -37,12 +37,12 @@
 
 namespace App\Models;
 
-use Exception;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-class Dokumen extends Model
+defined('BASEPATH') || exit('No direct script access allowed');
+
+class Dokumen extends BaseModel
 {
     public const DOKUMEN_WARGA = 1;
     public const ENABLE        = 1;
@@ -65,6 +65,15 @@ class Dokumen extends Model
     ];
 
     /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'attr' => 'json',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array
@@ -78,6 +87,13 @@ class Dokumen extends Model
         'kategori',
         'id_syarat',
         'dok_warga',
+    ];
+
+    /**
+     * {@inheritDoc}
+     */
+    protected $with = [
+        'kategoriDokumen',
     ];
 
     /**
@@ -138,12 +154,66 @@ class Dokumen extends Model
      * Scope query untuk status dokumen
      *
      * @param Builder $query
-     * @param mixed   $value
      *
      * @return Builder
      */
     public function scopeHidup($query)
     {
         return $query->where('deleted', '!=', 1);
+    }
+
+    /**
+     * Scope query untuk status aktif
+     *
+     * @param Builder $query
+     * @param string  $status
+     *
+     * @return Builder
+     */
+    public function scopeAktif($query, $status = '1')
+    {
+        return $query->where('enabled', $status);
+    }
+
+    /**
+     * Define a one-to-one relationship.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\hasOne
+     */
+    public function kategoriDokumen()
+    {
+        return $this->hasOne(RefDokumen::class, 'id', 'kategori');
+    }
+
+    /**
+     * Scope query untuk menyaring data dokumen berdasarkan parameter yang ditentukan
+     *
+     * @param Builder $query
+     * @param mixed   $value
+     *
+     * @return Builder
+     */
+    public function scopeFilters($query, array $filters = [])
+    {
+        foreach ($filters as $key => $value) {
+            $query->when($value ?? false, static function ($query) use ($value, $key) {
+                $query->where($key, $value);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Scope query untuk kategori dokumen
+     *
+     * @param Builder $query
+     * @param mixed   $value
+     *
+     * @return Builder
+     */
+    public function scopeKategori($query, $value = 1)
+    {
+        return $query->where('kategori', $value);
     }
 }

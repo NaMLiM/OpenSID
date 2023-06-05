@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,11 +29,15 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
  */
+
+use App\Models\RefJabatan;
+use App\Models\SettingAplikasi;
+use Illuminate\Support\Facades\Schema;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -64,27 +68,15 @@ class Setting_model extends MY_Model
 
     public function init()
     {
-        $pre = [];
-        $CI  = &get_instance();
+        $CI = &get_instance();
 
         if ($this->setting || ! $this->db->table_exists('setting_aplikasi')) {
             return;
         }
 
-        if ($this->config->item('useDatabaseConfig')) {
-            $pr = $this->db
-                ->order_by('key')
-                ->get('setting_aplikasi')
-                ->result();
+        $CI->list_setting = SettingAplikasi::orderBy('key')->get();
+        $CI->setting      = (object) SettingAplikasi::pluck('value', 'key')->toArray();
 
-            foreach ($pr as $p) {
-                $pre[addslashes($p->key)] = trim(addslashes($p->value));
-            }
-        } else {
-            $pre = (object) $CI->config->config;
-        }
-        $CI->setting      = (object) $pre;
-        $CI->list_setting = $pr; // Untuk tampilan daftar setting
         $this->apply_setting();
     }
 
@@ -99,12 +91,13 @@ class Setting_model extends MY_Model
             $this->setting->mapbox_key = config_item('mapbox_key');
         }
 
-        // Ganti token_layanan sesuai config untuk development untuk mempermudah rilis
+        // Ganti token_layanan sesuai config untuk mempermudah development
         if ((ENVIRONMENT == 'development') || config_item('token_layanan')) {
             $this->setting->layanan_opendesa_token = config_item('token_layanan');
         }
 
         $this->setting->user_admin = config_item('user_admin');
+
         // Kalau folder tema ubahan tidak ditemukan, ganti dengan tema default
         $pos = strpos($this->setting->web_theme, 'desa/');
         if ($pos !== false) {
@@ -113,6 +106,14 @@ class Setting_model extends MY_Model
                 $this->setting->web_theme = 'esensi';
             }
         }
+
+        // Sebutan kepala desa diambil dari tabel ref_jabatan dengan id = 1
+        // Diperlukan karena masih banyak yang menggunakan variabel ini, hapus jika tidak digunakan lagi
+        $this->setting->sebutan_kepala_desa = (Schema::hasTable('ref_jabatan')) ? RefJabatan::find(1)->nama : '';
+
+        // Sebutan sekretaris desa diambil dari tabel ref_jabatan dengan id = 2
+        $this->setting->sebutan_sekretaris_desa = (Schema::hasTable('ref_jabatan')) ? RefJabatan::find(2)->nama : '';
+
         $this->load->model('database_model');
         $this->database_model->cek_migrasi();
     }
@@ -134,6 +135,10 @@ class Setting_model extends MY_Model
 
                 if ($key == 'id_pengunjung_kehadiran') {
                     $value = alfanumerik(trim($value));
+                }
+
+                if ($key == 'api_opendk_key' && (empty(setting('api_opendk_server')) || empty(setting('api_opendk_user')) || empty(setting('api_opendk_password')))) {
+                    $value = null;
                 }
 
                 $this->update($key, $value);
@@ -203,13 +208,17 @@ class Setting_model extends MY_Model
     public function update($key = 'enable_track', $value = 1)
     {
         if (in_array($key, ['latar_kehadiran'])) {
-            $value = $this->upload_img('latar_kehadiran', LATAR_KEHADIRAN);
+            $value = $this->upload_img('latar_kehadiran', LATAR_LOGIN);
+        }
+
+        if ($key == 'tte' && $value == 1) {
+            $this->db->where('key', 'verifikasi_kades')->update('setting_aplikasi', ['value' => 1]); // jika tte aktif, aktifkan juga verifikasi kades
         }
 
         $outp = $this->db->where('key', $key)->update('setting_aplikasi', ['key' => $key, 'value' => $value]);
 
         // Hapus Cache
-        $this->cache->hapus_cache_untuk_semua('status_langganan');
+        // $this->cache->hapus_cache_untuk_semua('status_langganan');
         $this->cache->hapus_cache_untuk_semua('setting_aplikasi');
         $this->cache->hapus_cache_untuk_semua('_cache_modul');
 
@@ -257,21 +266,28 @@ class Setting_model extends MY_Model
         }
     }
 
-    public function load_options()
+    public function cekKebutuhanSistem()
     {
-        foreach ($this->list_setting as $i => $set) {
-            if (in_array($set->jenis, ['option', 'option-value', 'option-kode'])) {
-                $this->list_setting[$i]->options = $this->get_options($set->id);
-            }
-        }
-    }
+        $data = [];
 
-    private function get_options($id)
-    {
-        return $this->db->select('id, kode, value')
-            ->where('id_setting', $id)
-            ->get('setting_aplikasi_options')
-            ->result();
+        $sistem = [
+            ['max_execution_time', '>=', '300'],
+            ['post_max_size', '>=', '10M'],
+            ['upload_max_filesize', '>=', '20M'],
+            ['memory_limit', '>=', '256M'],
+        ];
+
+        foreach ($sistem as $value) {
+            [$key, $kondisi, $val] = $value;
+
+            $data[$key] = [
+                'v'      => $val,
+                $key     => ini_get($key),
+                'result' => version_compare(ini_get($key), $val, $kondisi),
+            ];
+        }
+
+        return $data;
     }
 
     public function cekEkstensi()
@@ -317,7 +333,7 @@ class Setting_model extends MY_Model
     {
         return [
             'versi' => PHP_VERSION,
-            'cek'   => (version_compare(PHP_VERSION, minPhpVersion) > 0 && version_compare(PHP_VERSION, maxPhpVersion) < 0),
+            'cek'   => (version_compare(PHP_VERSION, minPhpVersion, '>=') && version_compare(PHP_VERSION, maxPhpVersion, '<')),
         ];
     }
 
@@ -327,7 +343,7 @@ class Setting_model extends MY_Model
 
         return [
             'versi' => $versi,
-            'cek'   => (version_compare($versi, minMySqlVersion) > 0 && version_compare($versi, minMySqlVersion) > 0) || (version_compare($versi, minMariaDBVersion) > 0),
+            'cek'   => (version_compare($versi, minMySqlVersion, '>=') && version_compare($versi, maxMySqlVersion, '<')) || (version_compare($versi, minMariaDBVersion, '>=')),
         ];
     }
 }

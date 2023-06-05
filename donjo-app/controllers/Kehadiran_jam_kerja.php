@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -86,8 +86,8 @@ class Kehadiran_jam_kerja extends Admin_Controller
 
         $action      = 'Ubah';
         $form_action = route('kehadiran_jam_kerja.update', $id);
-        // TODO: Gunakan findOrFail
-        $kehadiran_jam_kerja = JamKerja::find($id) ?? show_404();
+
+        $kehadiran_jam_kerja = JamKerja::findOrFail($id);
 
         return view('admin.jam_kerja.form', compact('action', 'form_action', 'kehadiran_jam_kerja'));
     }
@@ -96,8 +96,7 @@ class Kehadiran_jam_kerja extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        // TODO: Gunakan findOrFail
-        $update = JamKerja::find($id) ?? show_404();
+        $update = JamKerja::findOrFail($id);
 
         if ($update->update($this->validate($this->request))) {
             redirect_with('success', 'Berhasil Ubah Data');

@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -37,7 +37,8 @@
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
-use Box\Spout\Writer\Common\Creator\WriterEntityFactory;
+use App\Enums\StatusEnum;
+use OpenSpout\Writer\Common\Creator\WriterEntityFactory;
 
 class Penduduk extends Admin_Controller
 {
@@ -52,7 +53,7 @@ class Penduduk extends Admin_Controller
         $this->modul_ini     = 2;
         $this->sub_modul_ini = 21;
         $this->_set_page     = ['50', '100', '200'];
-        $this->_list_session = ['filter_tahun', 'filter_bulan', 'status_hanya_tetap', 'jenis_peristiwa', 'filter', 'status_dasar', 'sex', 'agama', 'dusun', 'rw', 'rt', 'cari', 'umur_min', 'umur_max', 'umurx', 'pekerjaan_id', 'status', 'pendidikan_sedang_id', 'pendidikan_kk_id', 'status_penduduk', 'judul_statistik', 'cacat', 'cara_kb_id', 'akta_kelahiran', 'status_ktp', 'id_asuransi', 'status_covid', 'bantuan_penduduk', 'log', 'warganegara', 'menahun', 'hubungan', 'golongan_darah', 'hamil', 'kumpulan_nik', 'suku', 'bpjs_ketenagakerjaan', 'nik_sementara', 'tag_id_card'];
+        $this->_list_session = ['filter_tahun', 'filter_bulan', 'status_hanya_tetap', 'jenis_peristiwa', 'filter', 'status_dasar', 'sex', 'agama', 'dusun', 'rw', 'rt', 'cari', 'umur', 'umur_min', 'umur_max', 'umurx', 'pekerjaan_id', 'status', 'pendidikan_sedang_id', 'pendidikan_kk_id', 'status_penduduk', 'judul_statistik', 'cacat', 'cara_kb_id', 'akta_kelahiran', 'status_ktp', 'id_asuransi', 'status_covid', 'bantuan_penduduk', 'log', 'warganegara', 'menahun', 'hubungan', 'golongan_darah', 'hamil', 'kumpulan_nik', 'suku', 'bpjs_ketenagakerjaan', 'nik_sementara', 'tag_id_card'];
     }
 
     private function clear_session()
@@ -219,8 +220,8 @@ class Penduduk extends Admin_Controller
 
     public function dokumen($id = '')
     {
+        $data['penduduk']           = $this->penduduk_model->get_penduduk($id) ?? show_404();
         $data['list_dokumen']       = $this->penduduk_model->list_dokumen($id);
-        $data['penduduk']           = $this->penduduk_model->get_penduduk($id);
         $data['jenis_syarat_surat'] = $this->referensi_model->list_by_id('ref_syarat_surat', 'ref_syarat_id');
 
         $this->render('sid/kependudukan/penduduk_dokumen', $data);
@@ -383,7 +384,7 @@ class Penduduk extends Admin_Controller
 
     public function ajax_adv_search()
     {
-        $list_session = ['umur_min', 'umur_max', 'pekerjaan_id', 'status', 'agama', 'pendidikan_sedang_id', 'pendidikan_kk_id', 'status_penduduk', 'sex', 'status_dasar', 'cacat', 'cara_kb_id', 'status_ktp', 'id_asuransi', 'warganegara', 'golongan_darah', 'hamil', 'menahun', 'tag_id_card'];
+        $list_session = ['umur', 'umur_min', 'umur_max', 'pekerjaan_id', 'status', 'agama', 'pendidikan_sedang_id', 'pendidikan_kk_id', 'status_penduduk', 'sex', 'status_dasar', 'cacat', 'cara_kb_id', 'status_ktp', 'id_asuransi', 'warganegara', 'golongan_darah', 'hamil', 'menahun', 'tag_id_card'];
 
         foreach ($list_session as $list) {
             $data[$list] = $this->session->{$list} ?: '';
@@ -405,7 +406,7 @@ class Penduduk extends Admin_Controller
         $data['list_warganegara']     = $this->referensi_model->list_data('tweb_penduduk_warganegara');
         $data['list_golongan_darah']  = $this->referensi_model->list_data('tweb_golongan_darah');
         $data['list_sakit_menahun']   = $this->referensi_model->list_data('tweb_sakit_menahun');
-        $data['list_tag_id_card']     = $this->referensi_model->list_ref(STATUS);
+        $data['list_tag_id_card']     = StatusEnum::all();
         $data['form_action']          = site_url("{$this->controller}/adv_search_proses");
 
         $this->load->view('sid/kependudukan/ajax_adv_search_form', $data);
@@ -437,6 +438,7 @@ class Penduduk extends Admin_Controller
 
     private function validasi_pencarian($post)
     {
+        $data['umur']                 = $post['umur'];
         $data['umur_min']             = bilangan($post['umur_min']);
         $data['umur_max']             = bilangan($post['umur_max']);
         $data['pekerjaan_id']         = $post['pekerjaan_id'];
@@ -927,6 +929,13 @@ class Penduduk extends Admin_Controller
     public function program_bantuan_proses()
     {
         $id_program = $this->input->post('program_bantuan');
+
+        if ($id_program == JUMLAH) {
+            $id_program = JUMLAH;
+        } elseif ($id_program == BELUM_MENGISI) {
+            $id_program = BELUM_MENGISI;
+        }
+
         $this->statistik('bantuan_penduduk', $id_program, '0');
     }
 
@@ -951,7 +960,7 @@ class Penduduk extends Admin_Controller
             redirect($this->controller);
         }
 
-        $this->redirect_hak_akses('u');
+        $this->redirect_hak_akses('u', '', '', true);
 
         $data = [
             'form_action'          => route('penduduk.proses_impor'),
@@ -967,7 +976,7 @@ class Penduduk extends Admin_Controller
             redirect($this->controller);
         }
 
-        $this->redirect_hak_akses('u');
+        $this->redirect_hak_akses('u', '', '', true);
         $hapus = isset($_POST['hapus_data']);
         $this->impor_model->impor_excel($hapus);
         redirect('penduduk/impor');
@@ -979,7 +988,7 @@ class Penduduk extends Admin_Controller
             redirect($this->controller);
         }
 
-        $this->redirect_hak_akses('u');
+        $this->redirect_hak_akses('u', '', '', true);
 
         $data = [
             'form_action'          => route('penduduk.proses_impor_bip'),
@@ -995,7 +1004,7 @@ class Penduduk extends Admin_Controller
             redirect($this->controller);
         }
 
-        $this->redirect_hak_akses('u');
+        $this->redirect_hak_akses('u', '', '', true);
 
         if ($this->db->get('tweb_penduduk')->num_rows() > 0) {
             redirect_with('error', 'Tidak dapat mengimpor BIP ketika data penduduk telah ada', 'penduduk/impor_bip');

@@ -62,8 +62,6 @@
   </div>
 
   <script type="text/javascript">
-    var token = "<?= $this->setting->mapbox_key; ?>";
-
     $(document).ready(function () {
       document.querySelector('#modalLokasi').addEventListener('shown.bs.modal', function (event) {
         const link = $(event.relatedTarget);
@@ -86,11 +84,17 @@
         $("#lat").val(link.data('lat'));
         $("#lng").val(link.data('lng'));
 
+        
+        var options = {
+            maxZoom: <?= setting('max_zoom_peta') ?>,
+            minZoom: <?= setting('min_zoom_peta') ?>,
+        };
+
         // Inisialisasi tampilan peta
-        pembangunan = L.map('map').setView(posisi, zoom);
+        pembangunan = L.map('map', options).setView(posisi, zoom);
 
         // Menampilkan BaseLayers Peta
-        getBaseLayers(pembangunan, token);
+        getBaseLayers(pembangunan, "<?= setting('mapbox_key') ?>", "<?= setting('jenis_peta') ?>");
 
         // Tampilkan Posisi pembangunan
         marker = new L.Marker(posisi, {

@@ -7,6 +7,7 @@
     <title>Kehadiran Perangkat {{ ucwords($setting->sebutan_desa) }} </title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="robots" content="noindex">
+    <link rel="shortcut icon" href="<?= favico_desa() ?>" />
     <!-- Bootstrap 3.3.7 -->
     <link rel="stylesheet" href="{{ asset('bootstrap/css/bootstrap.min.css') }}"/>
     <!-- Jquery UI -->
@@ -35,7 +36,9 @@
     @endif
     @stack('css')
 
+    <?php if (cek_koneksi_internet()): ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700,300italic,400italic,600italic">
+    <?php endif ?>
 </head>
 
 <body class="hold-transition login-page">

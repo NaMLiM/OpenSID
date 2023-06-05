@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -121,13 +121,17 @@ class Plan_garis_model extends MY_Model
     public function list_data($o = 0, $offset = 0, $limit = 1000)
     {
         switch ($o) {
-            case 1: $order_sql = ' ORDER BY nama'; break;
+            case 1: $order_sql = ' ORDER BY nama';
+                break;
 
-            case 2: $order_sql = ' ORDER BY nama DESC'; break;
+            case 2: $order_sql = ' ORDER BY nama DESC';
+                break;
 
-            case 3: $order_sql = ' ORDER BY enabled'; break;
+            case 3: $order_sql = ' ORDER BY enabled';
+                break;
 
-            case 4: $order_sql = ' ORDER BY enabled DESC'; break;
+            case 4: $order_sql = ' ORDER BY enabled DESC';
+                break;
 
             default:$order_sql = ' ORDER BY id';
         }
@@ -178,11 +182,12 @@ class Plan_garis_model extends MY_Model
         $nama_file  = $_FILES['foto']['name'];
         $nama_file  = str_replace(' ', '-', $nama_file); 	 // normalkan nama file
         if (! empty($garis_file)) {
-            if ($tipe_file == 'image/jpg' || $tipe_file == 'image/jpeg') {
-                Uploadgaris($nama_file);
-                $data['foto'] = $nama_file;
-                $outp         = $this->db->insert($this->table, $data);
+            $upload = UploadPeta($nama_file, LOKASI_FOTO_GARIS);
+            if (! $upload) {
+                return;
             }
+            $data['foto'] = $nama_file;
+            $outp         = $this->db->insert($this->table, $data);
         } else {
             unset($data['foto']);
             $outp = $this->db->insert($this->table, $data);
@@ -198,12 +203,13 @@ class Plan_garis_model extends MY_Model
         $nama_file  = $_FILES['foto']['name'];
         $nama_file  = str_replace(' ', '-', $nama_file); 	 // normalkan nama file
         if (! empty($garis_file)) {
-            if ($tipe_file == 'image/jpg' || $tipe_file == 'image/jpeg') {
-                Uploadgaris($nama_file);
-                $data['foto'] = $nama_file;
-                $this->db->where('id', $id);
-                $outp = $this->db->update($this->table, $data);
+            $upload = UploadPeta($nama_file, LOKASI_FOTO_GARIS);
+            if (! $upload) {
+                return;
             }
+            $data['foto'] = $nama_file;
+            $this->db->where('id', $id);
+            $outp = $this->db->update($this->table, $data);
         } else {
             unset($data['foto']);
             $this->db->where('id', $id);
@@ -300,16 +306,21 @@ class Plan_garis_model extends MY_Model
         status_sukses($outp, $gagal_saja = false, $msg = 'titik koordinat garis harus diisi'); //Tampilkan Pesan
     }
 
-    public function list_garis()
+    public function list_garis($status = null)
     {
+        if (null !== $status) {
+            $this->db
+                ->where('l.enabled', $status)
+                ->where('p.enabled', $status)
+                ->where('m.enabled', $status);
+        }
+
         return $this->db
             ->select('l.*, p.nama AS kategori, m.nama AS jenis, p.simbol AS simbol, p.color AS color, p.tebal AS tebal, p.jenis AS jenis_garis')
             ->from('garis l')
             ->join('line p', 'l.ref_line = p.id', 'left')
-            ->join('line m', ' p.parrent = m.id')
-            ->where('l.enabled', 1)
-            ->where('p.enabled', 1)
-            ->where('m.enabled', 1)
+            ->join('line m', ' p.parrent = m.id', 'left')
+            ->where('l.ref_line !=', 0)
             ->get()
             ->result_array();
     }

@@ -73,6 +73,10 @@
     margin: 0px 5px 5px 0px;
 }
 
+.btn-mb-5{
+    margin-bottom: 5px;
+}
+
 
 /* Modifikasi Sidabar menu */
 .main-sidebar:hover {
@@ -739,4 +743,48 @@ div.form-surat .content-header {
     .control-sidebar.control-sidebar-open {
         width: 100%;
     }
+}
+
+.swal-lg{
+    width: 1000px !important;
+}
+.swal-input-250{
+    width: 250px !important;
+     margin-top: 1em !important;
+    margin-right: auto !important;
+    margin-bottom: 3px !important;
+    margin-left: auto !important;
+}
+.swal-left {
+    text-align: left !important;
+}
+
+.swal-bold {
+    font-weight: bold !important; 
+}
+
+@media (max-width: 1000px) {
+    .swal-lg{
+        width: 100%;
+    }
+}
+
+.info-box.active{
+    border: 2px solid #0045ffb8;
+}
+
+.radius-3 {
+    border-radius: 3px;
+}
+
+.radius-5 {
+    border-radius: 5px;
+}
+
+.radius-3>.btn:first-child:not(:last-child) {
+    border-radius: 3px;
+}
+
+.radius-5>.btn:first-child:not(:last-child) {
+    border-radius: 3px;
 }

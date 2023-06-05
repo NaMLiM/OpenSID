@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -92,10 +92,9 @@ class Kehadiran_hari_libur extends Admin_Controller
         $this->redirect_hak_akses('u');
 
         if ($id) {
-            $action      = 'Ubah';
-            $form_action = route('kehadiran_hari_libur.update', $id);
-            // TODO: Gunakan findOrFail
-            $kehadiran_hari_libur          = HariLibur::find($id) ?? show_404();
+            $action                        = 'Ubah';
+            $form_action                   = route('kehadiran_hari_libur.update', $id);
+            $kehadiran_hari_libur          = HariLibur::findOrFail($id);
             $kehadiran_hari_libur->tanggal = date('d-m-Y', strtotime($kehadiran_hari_libur->tanggal));
         } else {
             $action               = 'Tambah';
@@ -121,10 +120,11 @@ class Kehadiran_hari_libur extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        // TODO: Gunakan findOrFail
-        $update = HariLibur::find($id) ?? show_404();
+        $update = HariLibur::findOrFail($id);
 
-        if ($update->update($this->validate($this->request))) {
+        $data = $this->validate($this->request, $id);
+
+        if ($update->update($data)) {
             redirect_with('success', 'Berhasil Ubah Data');
         }
 
@@ -142,8 +142,36 @@ class Kehadiran_hari_libur extends Admin_Controller
         redirect_with('error', 'Gagal Hapus Data');
     }
 
-    private function validate($request = [])
+    private function validate($request = [], $id = '')
     {
+        $_POST['tanggal'] = date('Y-m-d', strtotime($request['tanggal']));
+
+        $this->load->library('form_validation');
+        $this->form_validation->set_error_delimiters('', '');
+        $rules = empty($id)
+            ? 'is_unique[kehadiran_hari_libur.tanggal]'
+            : "is_unique[kehadiran_hari_libur.tanggal,id,{$id}]";
+
+        $this->form_validation->set_rules([
+            [
+                'field'  => 'tanggal',
+                'label'  => 'Tanggal',
+                'rules'  => $rules,
+                'errors' => [
+                    'is_unique' => 'Tanggal terkait sudah ditambahkan pada hari libur',
+                ],
+            ],
+            [
+                'field' => 'keterangan',
+                'label' => 'Keterangan',
+                'rules' => 'required',
+            ],
+        ]);
+
+        if ($this->form_validation->run() !== true) {
+            redirect_with('error', trim(validation_errors()));
+        }
+
         return [
             'tanggal'    => date('Y-m-d', strtotime($request['tanggal'])),
             'keterangan' => strip_tags($request['keterangan']),

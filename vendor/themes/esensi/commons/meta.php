@@ -2,7 +2,8 @@
 
 <?php $nama_desa = ucwords($this->setting->sebutan_desa) .' '.ucwords($desa['nama_desa']) ?>
 
-<?php defined('THEME_VERSION') or define('THEME_VERSION', 'v22.06') ?>
+<?php defined('THEME_VERSION') or define('THEME_VERSION', 'v22.11') ?>
+<?php defined('IS_PREMIUM') or define('IS_PREMIUM', $is_premium) ?>
 <?php defined('NAMA_DESA') or define('NAMA_DESA', $nama_desa) ?>
 
 <?php $title = preg_replace("/[^A-Za-z0-9- ]/", '', trim(str_replace('-', ' ', get_dynamic_title_page_from_path())));
@@ -65,14 +66,25 @@ $desa_title = $title ? $title.' - '.$suffix : $suffix ?>
 <meta property='og:url' content="<?= current_url(); ?>" />
 <link rel="shortcut icon" href="<?= favico_desa() ?>"/>
 <noscript>You must have JavaScript enabled in order to use this theme. Please enable JavaScript and then reload this page in order to continue.</noscript>
+<?php if (cek_koneksi_internet()): ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<?php endif ?>
+<script src="<?= base_url('assets/js/highcharts/highcharts.js'); ?>"></script>
+<script src="<?= base_url('assets/js/highcharts/highcharts-3d.js'); ?>"></script>
+<script src="<?= base_url('assets/js/highcharts/exporting.js'); ?>"></script>
+<script src="<?= base_url('assets/js/highcharts/highcharts-more.js'); ?>"></script>
+<script src="<?= base_url('assets/js/highcharts/sankey.js'); ?>"></script>
+<script src="<?= base_url('assets/js/highcharts/organization.js'); ?>"></script>
+<script src="<?= base_url('assets/js/highcharts/accessibility.js'); ?>"></script>
+<?php if (cek_koneksi_internet()): ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.1.0/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-providers/1.6.0/leaflet-providers.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/1.11.1/mapbox-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl-leaflet/0.0.14/leaflet-mapbox-gl.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.cycle2/2.1.6/jquery.cycle2.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.cycle2/2.1.6/jquery.cycle2.carousel.js"></script>
+<?php endif ?>
 <script src="<?= base_url('assets/js/peta.js') ?>"></script>
 <script>
-  const BASE_URL = '<?= base_url() ?>';
+  var BASE_URL = '<?= base_url() ?>';
 </script>

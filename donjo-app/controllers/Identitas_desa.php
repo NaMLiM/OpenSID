@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -40,16 +40,21 @@ defined('BASEPATH') || exit('No direct script access allowed');
 use App\Models\Config;
 use App\Models\Pamong;
 use App\Models\Wilayah;
+use Illuminate\Support\Facades\Schema;
 
 class Identitas_desa extends Admin_Controller
 {
-    private $viewPath = 'admin.identitas_desa';
+    private $cek_kades;
 
     public function __construct()
     {
         parent::__construct();
         $this->modul_ini     = 200;
         $this->sub_modul_ini = 17;
+
+        if (Schema::hasTable('ref_jabatan')) {
+            $this->cek_kades = Pamong::kepalaDesa()->exists();
+        }
     }
 
     /**
@@ -59,8 +64,15 @@ class Identitas_desa extends Admin_Controller
      */
     public function index()
     {
-        return view("{$this->viewPath}.index", [
-            'main' => Config::with('pamong.penduduk')->first(),
+        $main = null;
+
+        if (Schema::hasTable('ref_jabatan')) {
+            $main = Config::first();
+        }
+
+        return view('admin.identitas_desa.index', [
+            'main'      => $main,
+            'cek_kades' => $this->cek_kades,
         ]);
     }
 
@@ -73,8 +85,11 @@ class Identitas_desa extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        $main   = Config::with('pamong')->first();
-        $pamong = Pamong::with('penduduk')->status()->get();
+        $main = null;
+
+        if (Schema::hasTable('ref_jabatan')) {
+            $main = Config::first();
+        }
 
         if ($main) {
             $form_action = route('identitas_desa.update', $main->id);
@@ -82,7 +97,9 @@ class Identitas_desa extends Admin_Controller
             $form_action = route('identitas_desa.insert');
         }
 
-        return view("{$this->viewPath}.form", compact('main', 'pamong', 'form_action'));
+        $cek_kades = $this->cek_kades;
+
+        return view('admin.identitas_desa.form', compact('main', 'form_action', 'cek_kades'));
     }
 
     /**
@@ -95,9 +112,14 @@ class Identitas_desa extends Admin_Controller
         $this->redirect_hak_akses('u');
 
         if (Config::insert($this->validate($this->request))) {
-            redirect_with('success', 'Berhasil Tambah Data');
+            return json([
+                'status' => true,
+            ]);
         }
-        redirect_with('error', 'Gagal Tambah Data');
+
+        return json([
+            'status' => false,
+        ]);
     }
 
     /**
@@ -111,14 +133,17 @@ class Identitas_desa extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        $data    = Config::find($id) ?? show_404();
-        $id_lama = $data['pamong_id'];
+        $data = Config::findOrFail($id);
 
         if ($data->update(static::validate($this->request))) {
-            static::pamong($id_lama, $this->request['pamong_id']);
-            redirect_with('success', 'Berhasil Ubah Data');
+            return json([
+                'status' => true,
+            ]);
         }
-        redirect_with('error', 'Gagal Ubah Data');
+
+        return json([
+            'status' => false,
+        ]);
     }
 
     /**
@@ -174,6 +199,7 @@ class Identitas_desa extends Admin_Controller
         if ($data->save()) {
             redirect_with('success', 'Berhasil Ubah Peta ' . ucwords($tipe));
         }
+
         redirect_with('error', 'Gagal Ubah Peta ' . ucwords($tipe));
     }
 
@@ -200,13 +226,16 @@ class Identitas_desa extends Admin_Controller
     // Hanya filter inputan
     protected static function validate($request = [])
     {
+        if ($request['ukuran'] == '') {
+            $request['ukuran'] = 100;
+        }
+
         return [
-            'logo'              => static::unggah('logo', true) ?? $request['old_logo'],
+            'logo'              => static::unggah('logo', true, bilangan($request['ukuran'])) ?? $request['old_logo'],
             'kantor_desa'       => static::unggah('kantor_desa') ?? $request['old_kantor_desa'],
-            'nama_desa'         => nama_terbatas($request['nama_desa']),
+            'nama_desa'         => nama_desa($request['nama_desa']),
             'kode_desa'         => bilangan($request['kode_desa']),
             'kode_pos'          => bilangan($request['kode_pos']),
-            'pamong_id'         => bilangan($request['pamong_id']),
             'alamat_kantor'     => alamat($request['alamat_kantor']),
             'email_desa'        => email($request['email_desa']),
             'telepon'           => bilangan($request['telepon']),
@@ -223,25 +252,7 @@ class Identitas_desa extends Admin_Controller
     }
 
     // TODO : Ganti cara ini
-    protected static function pamong($id_lama = '', $id_baru = '')
-    {
-        Pamong::where('pamong_id', $id_lama)
-            ->update([
-                'jabatan'       => null,
-                'pamong_status' => 0,
-                'pamong_ttd'    => 0,
-            ]);
-
-        Pamong::where('pamong_id', $id_baru)
-            ->update([
-                'jabatan'       => ucwords(get_instance()->setting->sebutan_kepala_desa),
-                'pamong_status' => 1,
-                'pamong_ttd'    => 1,
-            ]);
-    }
-
-    // TODO : Ganti cara ini
-    protected static function unggah($jenis = '', $resize = false)
+    protected static function unggah($jenis = '', $resize = false, $ukuran = false)
     {
         $CI = &get_instance();
         $CI->load->library('upload');
@@ -282,7 +293,7 @@ class Identitas_desa extends Admin_Controller
         if (! empty($uploadData)) {
             if ($resize) {
                 $tipe_file = TipeFile($_FILES['logo']);
-                $dimensi   = ['width' => 100, 'height' => 100];
+                $dimensi   = ['width' => $ukuran, 'height' => $ukuran];
                 resizeImage(LOKASI_LOGO_DESA . $uploadData['file_name'], $tipe_file, $dimensi);
                 resizeImage(LOKASI_LOGO_DESA . $uploadData['file_name'], $tipe_file, ['width' => 16, 'height' => 16], LOKASI_LOGO_DESA . 'favicon.ico');
             }

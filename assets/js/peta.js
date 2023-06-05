@@ -410,67 +410,72 @@ function set_marker_multi_content(
   }
 }
 
-function getBaseLayers(peta, access_token) {
+function getBaseLayers(peta, access_token, jenis_peta) {
   //Menampilkan BaseLayers Peta
-  var defaultLayer = L.tileLayer
-    .provider("OpenStreetMap.Mapnik", {
-      attribution:
-        '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
-    })
-    .addTo(peta);
+  var defaultLayer = L.tileLayer.provider('OpenStreetMap.Mapnik', {
+    attribution: '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>'
+  });
+
+  var OpenStreetMap = L.tileLayer.provider('OpenStreetMap.HOT', {
+    attribution: '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>'
+  });
 
   if (access_token) {
     mbGLstr = L.mapboxGL({
       accessToken: access_token,
-      style: "mapbox://styles/mapbox/streets-v11",
-      attribution:
-        '<a href="https://www.mapbox.com/about/maps">© Mapbox</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      attribution: '<a href="https://www.mapbox.com/about/maps">© Mapbox</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
     });
 
     mbGLsat = L.mapboxGL({
       accessToken: access_token,
-      style: "mapbox://styles/mapbox/satellite-v9",
-      attribution:
-        '<a href="https://www.mapbox.com/about/maps">© Mapbox</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
+      style: 'mapbox://styles/mapbox/satellite-v9',
+      attribution: '<a href="https://www.mapbox.com/about/maps">© Mapbox</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>'
     });
 
     mbGLstrsat = L.mapboxGL({
       accessToken: access_token,
-      style: "mapbox://styles/mapbox/satellite-streets-v11",
-      attribution:
-        '<a href="https://www.mapbox.com/about/maps">© Mapbox</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
+      style: 'mapbox://styles/mapbox/satellite-streets-v11',
+      attribution: '<a href="https://www.mapbox.com/about/maps">© Mapbox</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>'
     });
+
   } else {
-    mbGLstr = L.tileLayer
-      .provider("OpenStreetMap.Mapnik", {
-        attribution:
-          '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
-      })
-      .addTo(peta);
-    mbGLsat = L.tileLayer
-      .provider("OpenStreetMap.Mapnik", {
-        attribution:
-          '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
-      })
-      .addTo(peta);
-    mbGLstrsat = L.tileLayer
-      .provider("OpenStreetMap.Mapnik", {
-        attribution:
-          '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
-      })
-      .addTo(peta);
+    mbGLstr = L.tileLayer.provider('OpenStreetMap.Mapnik', {
+      attribution: '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>'
+    });
+    mbGLsat = L.tileLayer.provider('OpenStreetMap.Mapnik', {
+      attribution: '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>'
+    });
+    mbGLstrsat = L.tileLayer.provider('OpenStreetMap.Mapnik', {
+      attribution: '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>'
+    });
+  }
+
+  switch (jenis_peta) {
+    case '1':
+      defaultLayer.addTo(peta);
+      break;
+    case '2':
+      OpenStreetMap.addTo(peta);
+      break;
+    case '3':
+      mbGLstr.addTo(peta);
+      break;
+    case '4':
+      mbGLsat.addTo(peta);
+      break;
+    default:
+      mbGLstrsat.addTo(peta);
   }
 
   var baseLayers = {
-    OpenStreetMap: defaultLayer,
-    "OpenStreetMap H.O.T.": L.tileLayer.provider("OpenStreetMap.HOT", {
-      attribution:
-        '<a href="https://openstreetmap.org/copyright">© OpenStreetMap</a> | <a href="https://github.com/OpenSID/OpenSID">OpenSID</a>',
-    }),
-    "Mapbox Streets": mbGLstr,
-    "Mapbox Satellite": mbGLsat,
-    "Mapbox Satellite-Street": mbGLstrsat,
+    'OpenStreetMap': defaultLayer,
+    'OpenStreetMap H.O.T.': OpenStreetMap,
+    'Mapbox Streets': mbGLstr,
+    'Mapbox Satellite': mbGLsat,
+    'Mapbox Satellite-Street': mbGLstrsat
   };
+
   return baseLayers;
 }
 
@@ -1013,13 +1018,15 @@ function addPetaMultipoly(layerpeta) {
   return addPetaPoly;
 }
 
-function showCurrentPolygon(wilayah, layerpeta, warna) {
+function showCurrentPolygon(wilayah, layerpeta, warna, tampil_luas) {
   var daerah_wilayah = wilayah;
   daerah_wilayah[0].push(daerah_wilayah[0][0]);
   var poligon_wilayah = L.polygon(wilayah, {
     showMeasurements: true,
     measurementOptions: { showSegmentLength: false },
   }).addTo(layerpeta);
+
+  luas(poligon_wilayah, tampil_luas);
 
   poligon_wilayah.on("pm:edit", function (e) {
     document.getElementById("path").value = getLatLong(
@@ -1051,7 +1058,7 @@ function showCurrentPolygon(wilayah, layerpeta, warna) {
   return showCurrentPolygon;
 }
 
-function showCurrentMultiPolygon(wilayah, layerpeta, warna) {
+function showCurrentMultiPolygon(wilayah, layerpeta, warna, tampil_luas) {
   var area_wilayah = JSON.parse(JSON.stringify(wilayah));
   var bounds = new Array();
 
@@ -1063,6 +1070,9 @@ function showCurrentMultiPolygon(wilayah, layerpeta, warna) {
       showMeasurements: true,
       measurementOptions: { showSegmentLength: false },
     }).addTo(layerpeta);
+
+    luas(poligon_wilayah, tampil_luas);
+
     layers[poligon_wilayah._leaflet_id] = wilayah[i];
     poligon_wilayah.on("pm:edit", function (e) {
       var old_path = getLatLong("Poly", {
@@ -1159,7 +1169,7 @@ function showCurrentPoint(posisi1, layerpeta, mode = true) {
   return showCurrentPoint;
 }
 
-function showCurrentLine(wilayah, layerpeta, jenis, tebal, warna) {
+function showCurrentLine(wilayah, layerpeta, jenis, tebal, warna, tampil_luas) {
   var jenis = jenis ?? "solid";
   var tebal = tebal ?? 1;
   var warna = warna ?? "#A9AAAA";
@@ -1172,6 +1182,8 @@ function showCurrentLine(wilayah, layerpeta, jenis, tebal, warna) {
     showMeasurements: true,
     measurementOptions: { showSegmentLength: false },
   }).addTo(layerpeta);
+
+  luas(poligon_wilayah, tampil_luas);
 
   poligon_wilayah.on("pm:edit", function (e) {
     document.getElementById("path").value = getLatLong(
@@ -1201,13 +1213,15 @@ function showCurrentLine(wilayah, layerpeta, jenis, tebal, warna) {
   return showCurrentLine;
 }
 
-function showCurrentArea(wilayah, layerpeta) {
+function showCurrentArea(wilayah, layerpeta, tampil_luas) {
   var daerah_wilayah = wilayah;
   daerah_wilayah[0].push(daerah_wilayah[0][0]);
   var poligon_wilayah = L.polygon(wilayah, {
     showMeasurements: true,
     measurementOptions: { showSegmentLength: false },
   }).addTo(layerpeta);
+
+  luas(poligon_wilayah, tampil_luas);
 
   poligon_wilayah.on("pm:edit", function (e) {
     document.getElementById("path").value = getLatLong(
@@ -1237,27 +1251,55 @@ function showCurrentArea(wilayah, layerpeta) {
   return showCurrentArea;
 }
 
-function setMarkerCustom(marker, layercustom) {
+function setMarkerCustom(marker, layercustom, tampil_luas) {
   if (marker.length != 0) {
-    var geojson = L.geoJSON(turf.featureCollection(marker), {
-      pmIgnore: true,
-      showMeasurements: true,
-      measurementOptions: { showSegmentLength: false },
-      onEachFeature: function (feature, layer) {
-        layer.bindPopup(feature.properties.content);
-        layer.bindTooltip(feature.properties.content);
-      },
-      style: function (feature) {
-        if (feature.properties.style) {
-          return feature.properties.style;
-        }
-      },
-      pointToLayer: function (feature, latlng) {
-        if (feature.properties.style) {
-          return L.marker(latlng, { icon: feature.properties.style });
-        } else return L.marker(latlng);
-      },
-    });
+    if (tampil_luas == '1') {
+      var geojson = L.geoJSON(turf.featureCollection(marker), {
+        pmIgnore: true,
+        showMeasurements: true,
+        measurementOptions: {
+            showSegmentLength: false
+        },
+        onEachFeature: function (feature, layer) {
+          layer.bindPopup(feature.properties.content);
+          layer.bindTooltip(feature.properties.content);
+        },
+        style: function (feature) {
+          if (feature.properties.style) {
+            return feature.properties.style;
+          }
+        },
+        pointToLayer: function (feature, latlng) {
+          if (feature.properties.style) {
+            return L.marker(latlng, { icon: feature.properties.style });
+          } else return L.marker(latlng);
+        },
+      });
+    } else {
+      var geojson = L.geoJSON(turf.featureCollection(marker), {
+        pmIgnore: true,
+        showMeasurements: false,
+        measurementOptions: {
+          showSegmentLength: false
+        },
+        onEachFeature: function (feature, layer) {
+          layer.bindPopup(feature.properties.content);
+          layer.bindTooltip(feature.properties.content);
+        },
+        style: function (feature) {
+          if (feature.properties.style) {
+            return feature.properties.style;
+          }
+        },
+        pointToLayer: function (feature, latlng) {
+          if (feature.properties.style) {
+            return L.marker(latlng, {
+              icon: feature.properties.style
+            });
+          } else return L.marker(latlng);
+        },
+      });
+    }
 
     layercustom.addLayer(geojson);
   }
@@ -1265,27 +1307,58 @@ function setMarkerCustom(marker, layercustom) {
   return setMarkerCustom;
 }
 
-function setMarkerCluster(marker, markersList, markers) {
+function setMarkerCluster(marker, markersList, markers, tampil_luas) {
   if (marker.length != 0) {
-    var geojson = L.geoJSON(turf.featureCollection(marker), {
-      pmIgnore: true,
-      showMeasurements: true,
-      measurementOptions: { showSegmentLength: false },
-      onEachFeature: function (feature, layer) {
-        layer.bindPopup(feature.properties.content);
-        layer.bindTooltip(feature.properties.content);
-      },
-      style: function (feature) {
-        if (feature.properties.style) {
-          return feature.properties.style;
-        }
-      },
-      pointToLayer: function (feature, latlng) {
-        if (feature.properties.style) {
-          return L.marker(latlng, { icon: feature.properties.style });
-        } else return L.marker(latlng);
-      },
-    });
+    if (tampil_luas == '1') {
+      var geojson = L.geoJSON(turf.featureCollection(marker), {
+        pmIgnore: true,
+        showMeasurements: true,
+        measurementOptions: {
+          showSegmentLength: false
+        },
+        onEachFeature: function (feature, layer) {
+          layer.bindPopup(feature.properties.content);
+          layer.bindTooltip(feature.properties.content);
+        },
+        style: function (feature) {
+          if (feature.properties.style) {
+            return feature.properties.style;
+          }
+        },
+        pointToLayer: function (feature, latlng) {
+          if (feature.properties.style) {
+            return L.marker(latlng, {
+              icon: feature.properties.style
+            });
+          } else return L.marker(latlng);
+        },
+      });
+    } else {
+      var geojson = L.geoJSON(turf.featureCollection(marker), {
+        pmIgnore: true,
+        showMeasurements: false,
+        measurementOptions: {
+          showSegmentLength: false
+        },
+        onEachFeature: function (feature, layer) {
+          layer.bindPopup(feature.properties.content);
+          layer.bindTooltip(feature.properties.content);
+        },
+        style: function (feature) {
+          if (feature.properties.style) {
+            return feature.properties.style;
+          }
+        },
+        pointToLayer: function (feature, latlng) {
+          if (feature.properties.style) {
+            return L.marker(latlng, {
+              icon: feature.properties.style
+            });
+          } else return L.marker(latlng);
+        },
+      });
+    }
+    
 
     markersList.push(geojson);
     markers.addLayer(geojson);
@@ -1294,41 +1367,10 @@ function setMarkerCluster(marker, markersList, markers) {
   return setMarkerCluster;
 }
 
-function setMarkerClusterP(marker, markersListP, markersP) {
-  if (marker.length != 0) {
-    var geojson = L.geoJSON(turf.featureCollection(marker), {
-      pmIgnore: true,
-      showMeasurements: true,
-      measurementOptions: { showSegmentLength: false },
-      onEachFeature: function (feature, layer) {
-        layer.bindPopup(feature.properties.content);
-        layer.bindTooltip(feature.properties.content);
-      },
-      style: function (feature) {
-        if (feature.properties.style) {
-          return feature.properties.style;
-        }
-      },
-      pointToLayer: function (feature, latlng) {
-        if (feature.properties.style) {
-          return L.marker(latlng, { icon: feature.properties.style });
-        } else return L.marker(latlng);
-      },
-    });
-
-    markersListP.push(geojson);
-    markersP.addLayer(geojson);
-  }
-
-  return setMarkerClusterP;
-}
-
 function set_marker_area(marker, daftar_path, foto_area) {
   var daftar = daftar_path == "null" ? new Array() : JSON.parse(daftar_path);
   var jml = daftar.length;
   var jml_path;
-  var foto;
-  var content_area;
   var lokasi_gambar = foto_area;
 
   for (var x = 0; x < jml; x++) {
@@ -1339,15 +1381,6 @@ function set_marker_area(marker, daftar_path, foto_area) {
         daftar[x].path[0][y].reverse();
       }
 
-      if (daftar[x].foto) {
-        foto =
-          '<img src="' +
-          lokasi_gambar +
-          "sedang_" +
-          daftar[x].foto +
-          '" style=" width:200px;height:140px;border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px;border:2px solid #555555;"/>';
-      } else foto = "";
-
       var area_style = {
         stroke: true,
         opacity: 1,
@@ -1356,25 +1389,10 @@ function set_marker_area(marker, daftar_path, foto_area) {
         fillOpacity: 0.5,
       };
 
-      content_area =
-        '<div id="content">' +
-        '<div id="siteNotice">' +
-        "</div>" +
-        '<h4 id="firstHeading" class="firstHeading">' +
-        daftar[x].nama +
-        "</h4>" +
-        '<div id="bodyContent">' +
-        foto +
-        "<p>" +
-        daftar[x].desk +
-        "</p>" +
-        "</div>" +
-        "</div>";
-
       daftar[x].path[0].push(daftar[x].path[0][0]);
       marker.push(
         turf.polygon(daftar[x].path, {
-          content: content_area,
+          content: popUpContent(daftar[x], lokasi_gambar),
           style: area_style,
         })
       );
@@ -1387,8 +1405,6 @@ function set_marker_garis(marker, daftar_path, foto_garis) {
   var jml = daftar.length;
   var coords;
   var lengthOfCoords;
-  var foto;
-  var content_garis;
   var lokasi_gambar = foto_garis;
 
   for (var x = 0; x < jml; x++) {
@@ -1402,30 +1418,6 @@ function set_marker_garis(marker, daftar_path, foto_garis) {
         coords[i][1] = holdLon;
       }
 
-      if (daftar[x].foto) {
-        foto =
-          '<img src="' +
-          lokasi_gambar +
-          "sedang_" +
-          daftar[x].foto +
-          '" style=" width:200px;height:140px;border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px;border:2px solid #555555;"/>';
-      } else foto = "";
-
-      content_garis =
-        '<div id="content">' +
-        '<div id="siteNotice">' +
-        "</div>" +
-        '<h4 id="firstHeading" class="firstHeading">' +
-        daftar[x].nama +
-        "</h4>" +
-        '<div id="bodyContent">' +
-        foto +
-        "<p>" +
-        daftar[x].desk +
-        "</p>" +
-        "</div>" +
-        "</div>";
-
       var garis_style = {
         stroke: true,
         opacity: 1,
@@ -1435,7 +1427,10 @@ function set_marker_garis(marker, daftar_path, foto_garis) {
       };
 
       marker.push(
-        turf.lineString(coords, { content: content_garis, style: garis_style })
+        turf.lineString(coords, {
+          content: popUpContent(daftar[x], lokasi_gambar),
+          style: garis_style
+        })
       );
     }
   }
@@ -1444,8 +1439,6 @@ function set_marker_garis(marker, daftar_path, foto_garis) {
 function set_marker_lokasi(marker, daftar_path, path_icon, foto_lokasi) {
   var daftar = daftar_path == "null" ? new Array() : JSON.parse(daftar_path);
   var jml = daftar.length;
-  var foto;
-  var content_lokasi;
   var lokasi_gambar = foto_lokasi;
   var path_foto = path_icon;
   var point_style = {
@@ -1457,33 +1450,10 @@ function set_marker_lokasi(marker, daftar_path, path_icon, foto_lokasi) {
   for (var x = 0; x < jml; x++) {
     if (daftar[x].lat) {
       point_style.iconUrl = path_foto + daftar[x].simbol;
-      if (daftar[x].foto) {
-        foto =
-          '<img src="' +
-          lokasi_gambar +
-          "sedang_" +
-          daftar[x].foto +
-          '" style=" width:200px;height:140px;border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px;border:2px solid #555555;"/>';
-      } else foto = "";
-
-      content_lokasi =
-        '<div id="content">' +
-        '<div id="siteNotice">' +
-        "</div>" +
-        '<h4 id="firstHeading" class="firstHeading">' +
-        daftar[x].nama +
-        "</h4>" +
-        '<div id="bodyContent">' +
-        foto +
-        "<p>" +
-        daftar[x].desk +
-        "</p>" +
-        "</div>" +
-        "</div>";
 
       marker.push(
         turf.point([daftar[x].lng, daftar[x].lat], {
-          content: content_lokasi,
+          content: popUpContent(daftar[x], lokasi_gambar),
           style: L.icon(point_style),
         })
       );
@@ -1572,8 +1542,7 @@ function set_marker_lokasi_pembangunan(
         "</tr>" +
         "</table>" +
         '<center><a href="' +
-        link_progress +
-        daftar[x].slug +
+        link_progress + '/' + daftar[x].slug +
         '" target="_blank" class="btn btn-flat bg-red btn-sm"><i class="fa fa-info"></i> Selengkapnya</a>' +
         "</div>";
 
@@ -1596,7 +1565,8 @@ function tampilkan_layer_area_garis_lokasi(
   path_icon,
   foto_area,
   foto_garis,
-  foto_lokasi
+  foto_lokasi,
+  tampil_luas
 ) {
   var marker_area = [];
   var marker_garis = [];
@@ -1631,9 +1601,9 @@ function tampilkan_layer_area_garis_lokasi(
     set_marker_lokasi(marker_lokasi, daftar_lokasi, path_icon, foto_lokasi);
   }
 
-  setMarkerCustom(marker_area, layer_area);
-  setMarkerCustom(marker_garis, layer_garis);
-  setMarkerCluster(marker_lokasi, markersList, markers);
+  setMarkerCustom(marker_area, layer_area, tampil_luas);
+  setMarkerCustom(marker_garis, layer_garis, tampil_luas);
+  setMarkerCluster(marker_lokasi, markersList, markers, tampil_luas);
 
   peta.on("layeradd layerremove", function () {
     peta.eachLayer(function (layer) {
@@ -1663,7 +1633,8 @@ function tampilkan_layer_area_garis_lokasi_plus(
   foto_lokasi,
   foto_lokasi_pembangunan,
   link_progress,
-  daftar_persil
+  daftar_persil,
+  tampil_luas
 ) {
   var marker_area = [];
   var marker_garis = [];
@@ -1727,13 +1698,13 @@ function tampilkan_layer_area_garis_lokasi_plus(
       "#isi_popup_persil_",
       path_icon_pembangunan
     );
-    setMarkerCustom(marker_persil, layer_persil);
+    setMarkerCustom(marker_persil, layer_persil, tampil_luas);
   }
 
-  setMarkerCustom(marker_area, layer_area);
-  setMarkerCustom(marker_garis, layer_garis);
-  setMarkerCluster(marker_lokasi, markersList, markers);
-  setMarkerClusterP(marker_lokasi_pembangunan, markersListP, markersP);
+  setMarkerCustom(marker_area, layer_area, tampil_luas);
+  setMarkerCustom(marker_garis, layer_garis, tampil_luas);
+  setMarkerCluster(marker_lokasi, markersList, markers, tampil_luas);
+  setMarkerCluster(marker_lokasi_pembangunan, markersListP, markersP, tampil_luas);
 
   peta.on("layeradd layerremove", function () {
     peta.eachLayer(function (layer) {
@@ -1828,18 +1799,6 @@ function cetakPeta(layerpeta) {
     }
   );
 
-  window.print = function () {
-    return domtoimage
-      .toPng(document.querySelector(".grid-print-container"))
-      .then(function (dataUrl) {
-        var link = document.createElement("a");
-        link.download =
-          layerpeta.printControl.options.documentTitle ||
-          "exportedMap" + ".png";
-        link.href = dataUrl;
-        link.click();
-      });
-  };
   return cetakPeta;
 }
 
@@ -2001,135 +1960,6 @@ function setlegendPetaDesa(legenda, layerpeta, legendData, judul, nama_wil) {
   return setlegendPetaDesa;
 }
 
-//loading Peta Desa Pengguna OpenSID (Data dari API Server)
-function pantau_desa(layer_desa, tracker_host, kode_desa, img, token) {
-  var pantau_desa = $.getJSON(
-    tracker_host +
-      "/index.php/api/wilayah/geoprov?token=" +
-      token +
-      "&kode_desa=" +
-      kode_desa,
-    function (data) {
-      var datalayer = L.geoJson(data, {
-        onEachFeature: function (feature, layer) {
-          var custom_icon = L.icon({ iconSize: [16, 16], iconUrl: img });
-          layer.setIcon(custom_icon);
-          var popup_0 = L.popup({ maxWidth: "100%" });
-          var customOptions = { maxWidth: "325", className: "covid_pop" };
-          var html_a = $(
-            '<div id="html_a" style="width: 100.0%; height: 100.0%;">' +
-              '<h4><b style="color:red">' +
-              feature.properties.desa +
-              "</b></h4>" +
-              "<table>" +
-              "<tr>" +
-              '<td><b style="color:green">Alamat : ' +
-              feature.properties.alamat +
-              "</b></td>" +
-              "</tr>" +
-              "<tr>" +
-              '<td><b style="color:green">Kecamatan : ' +
-              feature.properties.kec +
-              "</b></td>" +
-              "</tr>" +
-              "<tr>" +
-              '<td><b style="color:green">Kab/Kota : ' +
-              feature.properties.kab +
-              "</b></td>" +
-              "</tr>" +
-              "<tr>" +
-              '<td><b style="color:green">Provinsi : ' +
-              feature.properties.prov +
-              "</b></td>" +
-              "</tr>" +
-              "<tr>" +
-              '<td><b style="color:green">Website : ' +
-              '<a href="' +
-              "http://" +
-              feature.properties.web +
-              '" + " target="_blank">' +
-              "http://" +
-              feature.properties.web +
-              "</a>" +
-              "</b></td>" +
-              "</tr>" +
-              "</table></div>"
-          )[0];
-          popup_0.setContent(html_a);
-          layer.bindPopup(popup_0, customOptions);
-          layer.bindTooltip(feature.properties.desa, {
-            sticky: true,
-            direction: "top",
-          });
-        },
-      });
-      layer_desa.addLayer(datalayer);
-      var infodesa = data;
-      var nama_prov = infodesa.nama_provinsi;
-      var jml_desa_prov = infodesa.jml_desa_prov;
-      var lat = infodesa.lat;
-      var lng = infodesa.lng;
-      let attributes = ["nama_prov", "jml_desa_prov"];
-      attributes.forEach(function (attr) {
-        $(`.${attr}`).html(eval(attr));
-      });
-
-      $.ajax({
-        type: "GET",
-        url:
-          tracker_host +
-          "/index.php/api/wilayah/geokab?token=" +
-          token +
-          "&kode_desa=" +
-          kode_desa,
-        dataType: "json",
-        success: function (data) {
-          var nama_kab = data.nama_kabupaten;
-          var jml_desa_kab = data.jml_desa_kab;
-          let attributes = ["nama_kab", "jml_desa_kab"];
-          attributes.forEach(function (attr) {
-            $(`.${attr}`).html(eval(attr));
-          });
-        },
-      });
-
-      $.ajax({
-        type: "GET",
-        url:
-          tracker_host +
-          "/index.php/api/wilayah/geokec?token=" +
-          token +
-          "&kode_desa=" +
-          kode_desa,
-        dataType: "json",
-        success: function (data) {
-          var nama_kec = data.nama_kecamatan;
-          var jml_desa_kec = data.jml_desa_kec;
-          let attributes = ["nama_kec", "jml_desa_kec"];
-          attributes.forEach(function (attr) {
-            $(`.${attr}`).html(eval(attr));
-          });
-        },
-      });
-
-      $.ajax({
-        type: "GET",
-        url: tracker_host + "/index.php/api/wilayah/geoneg?token=" + token,
-        dataType: "json",
-        success: function (data) {
-          var nama_negara = data.nama_negara;
-          var jml_desa = data.jml_desa;
-          let attributes = ["nama_negara", "jml_desa"];
-          attributes.forEach(function (attr) {
-            $(`.${attr}`).html(eval(attr));
-          });
-        },
-      });
-    }
-  );
-  return pantau_desa;
-}
-
 function get_path_import(coords, multi = false) {
   var path = JSON.stringify(coords)
     .replace("]],[[", "],[")
@@ -2172,4 +2002,40 @@ function jenis_garis(jenis) {
   }
 
   return dashArray;
+}
+
+function popUpContent(daftar, lokasi_gambar) {
+  var foto;
+  var content_area;
+
+  if (daftar.foto) {
+    foto =
+      '<img src="' +
+      lokasi_gambar +
+      "sedang_" +
+      daftar.foto +
+      '" style="max-width:200px;height:auto;border-radius:3px;-moz-border-radius:3px;-webkit-border-radius:3px;border:2px solid #555555;"/>';
+  } else foto = "";
+
+  content_area =
+    '<div id="content">' +
+      '<div id="siteNotice">' +
+      '</div>' +
+        '<h4 id="firstHeading" class="firstHeading text-center">' + daftar.nama + '</h4>' +
+      '<div id="bodyContent"><center>' +
+        foto +
+        '</center>' + 
+        '<p style="white-space: pre-line">' + daftar.desk + '</p>' +
+      '</div>' +
+    '</div>';
+
+  return content_area;
+}
+
+function luas(map, tampil_luas) {
+  if (tampil_luas == '1') {
+    return map.showMeasurements();
+  }
+
+  return map.hideMeasurements();
 }

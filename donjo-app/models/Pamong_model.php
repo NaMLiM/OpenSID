@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -37,6 +37,10 @@
 
 use App\Models\Kehadiran;
 use App\Models\KehadiranPengaduan;
+use App\Models\LogSurat;
+use App\Models\Pamong;
+use App\Models\RefJabatan;
+use Illuminate\Support\Facades\Schema;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -54,13 +58,18 @@ class Pamong_model extends CI_Model
 
     public function list_data($offset = 0, $limit = 500)
     {
-        $this->db->select('u.*, p.nama, p.nik, p.tag_id_card, p.tempatlahir, p.tanggallahir,
-			(case when p.sex is not null then p.sex else u.pamong_sex end) as id_sex,
-			(case when p.foto is not null then p.foto else u.foto end) as foto,
-			x.nama AS sex, b.nama AS pendidikan_kk, g.nama AS agama, x2.nama AS pamong_sex, b2.nama AS pamong_pendidikan, g2.nama AS pamong_agama');
+        $this->db->select(
+            'u.*, rj.nama AS jabatan, rj.id AS ref_jabatan_id, p.nama, p.nik, p.tag_id_card, p.tempatlahir, p.tanggallahir,
+            (case when p.sex is not null then p.sex else u.pamong_sex end) as id_sex,
+            (case when p.foto is not null then p.foto else u.foto end) as foto,
+            (case when p.nama is not null then p.nama else u.pamong_nama end) as nama,
+            x.nama AS sex, b.nama AS pendidikan_kk, g.nama AS agama, x2.nama AS pamong_sex, b2.nama AS pamong_pendidikan, g2.nama AS pamong_agama,
+            !EXISTS (SELECT s.id_pamong FROM log_surat as s where s.id_pamong = u.pamong_id  ) as deletable'
+        );
 
         $this->list_data_sql();
-        $this->db->order_by('u.urut')
+        $this->db
+            ->order_by('u.urut')
             ->limit($limit, $offset);
 
         $data = $this->db->get()->result_array();
@@ -70,7 +79,6 @@ class Pamong_model extends CI_Model
         for ($i = 0; $i < count($data); $i++) {
             if (empty($data[$i]['id_pend'])) {
                 // Dari luar desa
-                $data[$i]['nama']          = $data[$i]['pamong_nama'];
                 $data[$i]['nik']           = $data[$i]['pamong_nik'];
                 $data[$i]['tag_id_card']   = $data[$i]['pamong_tag_id_card'];
                 $data[$i]['tempatlahir']   = ! empty($data[$i]['pamong_tempatlahir']) ? $data[$i]['pamong_tempatlahir'] : '-';
@@ -89,7 +97,9 @@ class Pamong_model extends CI_Model
                     $data[$i]['tempatlahir'] = '-';
                 }
             }
-            $data[$i]['no'] = $j + 1;
+
+            $data[$i]['nama'] = gelar($data[$i]['gelar_depan'], $data[$i]['nama'], $data[$i]['gelar_belakang']);
+            $data[$i]['no']   = $j + 1;
             $j++;
         }
 
@@ -123,7 +133,8 @@ class Pamong_model extends CI_Model
             ->join('tweb_penduduk_agama g', 'p.agama_id = g.id', 'LEFT')
             ->join('tweb_penduduk_pendidikan_kk b2', 'u.pamong_pendidikan = b2.id', 'LEFT')
             ->join('tweb_penduduk_sex x2', 'u.pamong_sex = x2.id', 'LEFT')
-            ->join('tweb_penduduk_agama g2', 'u.pamong_agama = g2.id', 'LEFT');
+            ->join('tweb_penduduk_agama g2', 'u.pamong_agama = g2.id', 'LEFT')
+            ->join('ref_jabatan rj', 'rj.id = u.jabatan_id', 'left');
         $this->search_sql();
         $this->filter_sql();
     }
@@ -173,12 +184,13 @@ class Pamong_model extends CI_Model
     public function get_data($id = 0)
     {
         $data = $this->db
-            ->select('u.*,
+            ->select('u.*, rj.nama AS jabatan, rj.nama AS pamong_jabatan, rj.id AS ref_jabatan_id,
 				(case when p.nama is not null then p.nama else u.pamong_nama end) as nama,
 				(case when p.foto is not null then p.foto else u.foto end) as foto,
 				(case when p.sex is not null then p.sex else u.pamong_sex end) as id_sex')
             ->from('tweb_desa_pamong u')
             ->join('tweb_penduduk p', 'u.id_pend = p.id', 'left')
+            ->join('ref_jabatan rj', 'rj.id = u.jabatan_id', 'left')
             ->where('pamong_id', $id)
             ->get()
             ->row_array();
@@ -194,6 +206,8 @@ class Pamong_model extends CI_Model
             }
         }
 
+        $data['nama'] = gelar($data['gelar_depan'], $data['nama'], $data['gelar_belakang']);
+
         return $data;
     }
 
@@ -206,8 +220,7 @@ class Pamong_model extends CI_Model
     {
         $post = $this->input->post();
         $data = $this->siapkan_data($post);
-        // Beri urutan terakhir
-        $data['urut']                 = $this->urut_model->urut_max() + 1;
+
         $data['pamong_tgl_terdaftar'] = date('Y-m-d');
 
         $outp       = $this->db->insert('tweb_desa_pamong', $data);
@@ -215,16 +228,33 @@ class Pamong_model extends CI_Model
 
         $this->foto($post);
 
+        if ($data['jabatan_id'] == '1') {
+            $this->ttd('pamong_ttd', $post['id'], 1);
+        } else {
+            $this->ttd('pamong_ub', $post['id'], 1);
+        }
+
         status_sukses($outp);
     }
 
     public function update($id = 0)
     {
-        $post       = $this->input->post();
-        $data       = $this->siapkan_data($post);
+        $post = $this->input->post();
+        $data = $this->siapkan_data($post);
+
+        if (! in_array($data['jabatan_id'], ['1', '2'])) {
+            $data['pamong_ttd'] = $data['pamong_ub'] = 0;
+        }
+
         $outp       = $this->db->where('pamong_id', $id)->update('tweb_desa_pamong', $data);
         $post['id'] = $id;
         $this->foto($post);
+
+        if ($data['jabatan_id'] == '1') {
+            $this->ttd('pamong_ttd', $post['id'], 1);
+        } else {
+            $this->ttd('pamong_ub', $post['id'], 1);
+        }
 
         status_sukses($outp);
     }
@@ -236,15 +266,16 @@ class Pamong_model extends CI_Model
             $id    = $post['id_pend'];
             $field = 'id';
             $tabel = 'tweb_penduduk';
+            $foto  = time() . '-' . $id . '-' . mt_rand(10000, 999999);
         } else {
             // Penduduk Luar Desa
             $id    = $post['id'];
             $field = 'pamong_id';
             $tabel = 'tweb_desa_pamong';
+            $foto  = 'pamong_' . time() . '-' . $id . '-' . mt_rand(10000, 999999);
         }
 
-        // Upload foto dilakukan setelah ada id, karena nama foto berisi nik
-        if ($foto = upload_foto_penduduk()) {
+        if ($foto = upload_foto_penduduk($foto)) {
             $this->db->where($field, $id)->update($tabel, ['foto' => $foto]);
         }
     }
@@ -253,7 +284,7 @@ class Pamong_model extends CI_Model
     {
         // Cek boleh hapus
         if ($this->boleh_hapus($id)) {
-            return session_error("ID : {$id} tidak dapat dihapus, data sudah tersedia di kehadiran perangkat dan pengaduan kehadiran.");
+            return session_error("ID : {$id} tidak dapat dihapus, data sudah tersedia di kehadiran perangkatl, pengaduan kehadiran dan layanan Surat.");
         }
 
         if (! $semua) {
@@ -291,7 +322,7 @@ class Pamong_model extends CI_Model
         $data['pamong_niap']        = strip_tags($post['pamong_niap']);
         $data['pamong_tag_id_card'] = strip_tags($post['pamong_tag_id_card']) ?: null;
         $data['pamong_pin']         = strip_tags($post['pamong_pin']);
-        $data['jabatan']            = strip_tags($post['jabatan']);
+        $data['jabatan_id']         = bilangan($post['jabatan_id']);
         $data['pamong_pangkat']     = strip_tags($post['pamong_pangkat']);
         $data['pamong_status']      = $post['pamong_status'];
         $data['pamong_nosk']        = empty($post['pamong_nosk']) ? '' : strip_tags($post['pamong_nosk']);
@@ -304,6 +335,16 @@ class Pamong_model extends CI_Model
         $data['bagan_offset']       = (int) $post['bagan_offset'] ?: null;
         $data['bagan_layout']       = htmlentities($post['bagan_layout']);
         $data['bagan_warna']        = warna($post['bagan_warna']);
+        $data['gelar_depan']        = strip_tags($post['gelar_depan']) ?: null;
+        $data['gelar_belakang']     = strip_tags($post['gelar_belakang']) ?: null;
+
+        if ($data['jabatan_id'] == RefJabatan::KADES) {
+            $data['urut'] = 1;
+        } elseif ($data['jabatan_id'] == RefJabatan::SEKDES) {
+            $data['urut'] = 2;
+        } else {
+            $data['urut'] = $this->urut_model->urut_max() + 1;
+        }
 
         if (empty($data['id_pend'])) {
             $data['id_pend']             = null;
@@ -319,16 +360,43 @@ class Pamong_model extends CI_Model
         return $data;
     }
 
+    /**
+     * Update pamong ttd.
+     *
+     * @param mixed $jenis Jenis pamong_ttd atau pamong_ub
+     * @param mixed $id    ID pamong
+     * @param mixed $val   1. checklist 2. un-checklist
+     *
+     * @return mixed
+     */
     public function ttd($jenis, $id, $val)
     {
-        if ($val == 1) {
-            // Hanya satu pamong yang boleh digunakan sebagai ttd a.n / u.b
-            $this->db->where($jenis, 1)->update('tweb_desa_pamong', [$jenis => 0]);
+        $pamong = Pamong::findOrFail($id);
+
+        if ($jenis == 'a.n') {
+            if ($pamong->jabatan_id == '2') {
+                $output = Pamong::where('jabatan_id', 2)->find($id)->update(['pamong_ttd' => $val]);
+
+                // Hanya 1 yang bisa jadi a.n dan harus sekretaris
+                if ($output) {
+                    Pamong::where('pamong_ttd', 1)->where('pamong_id', '!=', $id)->update(['pamong_ttd' => 0]);
+                }
+            } else {
+                $pesan = ', Penandatangan a.n harus ' . RefJabatan::whereId(2)->first(['nama'])->nama;
+            }
         }
 
-        $outp = $this->db->where('pamong_id', $id)->update('tweb_desa_pamong', [$jenis => $val]);
+        if ($jenis == 'u.b') {
+            if (! in_array($pamong->jabatan_id, RefJabatan::EXCLUDE_DELETE)) {
+                $output = Pamong::whereNotIn('jabatan_id', RefJabatan::EXCLUDE_DELETE)->find($id)->update(['pamong_ub' => $val]);
+            } else {
+                $pesan = ', Penandatangan u.b harus pamong selain ' . RefJabatan::whereId(1)->first(['nama'])->nama . ' dan ' . RefJabatan::whereId(2)->first(['nama'])->nama;
+            }
+        }
 
-        status_sukses($outp);
+        session_error($pesan);
+
+        return status_sukses($output);
     }
 
     private function select_data_pamong()
@@ -353,7 +421,8 @@ class Pamong_model extends CI_Model
 
         return $this->db
             ->where('m.pamong_ttd', 1)
-            ->get()->row_array();
+            ->get()
+            ->row_array();
     }
 
     public function get_ub()
@@ -362,7 +431,8 @@ class Pamong_model extends CI_Model
 
         return $this->db
             ->where('pamong_ub', 1)
-            ->get()->row_array();
+            ->get()
+            ->row_array();
     }
 
     // $arah:
@@ -389,9 +459,14 @@ class Pamong_model extends CI_Model
     // Ambil data untuk widget aparatur desa
     public function list_aparatur_desa()
     {
+        // Jika kolom jabatan_id tidak tersedia, jangan tampilkan dulu.
+        if (! Schema::hasColumn('tweb_desa_pamong', 'jabatan_id')) {
+            return null;
+        }
+
         $data_query = $this->db
             ->select(
-                'dp.jabatan, dp.pamong_niap, k.status_kehadiran,
+                'rj.nama AS jabatan, dp.pamong_niap, k.tanggal, k.status_kehadiran,
                 CASE WHEN dp.id_pend IS NULL THEN dp.foto ELSE p.foto END as foto,
                 CASE WHEN p.sex IS NOT NULL THEN p.sex ELSE dp.pamong_sex END as id_sex,
                 CASE WHEN dp.id_pend IS NULL THEN dp.pamong_nama ELSE p.nama END AS nama',
@@ -400,6 +475,7 @@ class Pamong_model extends CI_Model
             ->from('tweb_desa_pamong dp')
             ->join('tweb_penduduk p', 'p.id = dp.id_pend', 'left')
             ->join('kehadiran_perangkat_desa k', 'k.pamong_id = dp.pamong_id', 'left')
+            ->join('ref_jabatan rj', 'rj.id = dp.jabatan_id', 'left')
             ->where('dp.pamong_status', '1')
             ->order_by('dp.urut')
             ->get()
@@ -417,20 +493,25 @@ class Pamong_model extends CI_Model
     //----------------------------------------------------------------------------------------------------
 
     /**
-     * @param $id id
+     * @param $id  id
      * @param $val status : 1 = Unlock, 2 = Lock
      */
     public function lock($id, $val)
     {
-        $outp = $this->db
-            ->where('pamong_id', $id)
-            ->update('tweb_desa_pamong', ['pamong_status' => $val]);
+        $pamong        = Pamong::find($id);
+        $jabatan_aktif = Pamong::whereJabatanId($pamong->jabatan_id)->wherePamongStatus(1)->exists();
 
+        // Cek untuk kades atau sekdes apakah sudah ada yang aktif saat mengaktifkan
+        if ($val == 1 && $jabatan_aktif && in_array($pamong->jabatan_id, RefJabatan::EXCLUDE_DELETE)) {
+            return session_error('<br>Pamong ' . $pamong->jabatan->nama . ' sudah tersedia, silahakan non-aktifkan terlebih dahulu jika ingin menggantinya.');
+        }
+
+        $outp = $pamong->update(['pamong_status' => $val]);
         status_sukses($outp);
     }
 
     /**
-     * @param $id id
+     * @param $id  id
      * @param $val status : 1 = Aktif, 0 = Tidak aktif
      */
     public function kehadiran($id, $val)
@@ -462,11 +543,12 @@ class Pamong_model extends CI_Model
         }
 
         $data['nodes'] = $this->db
-            ->select('p.pamong_id, p.jabatan, p.bagan_tingkat, p.bagan_offset, p.bagan_layout, p.bagan_warna')
+            ->select('p.pamong_id, rj.nama AS jabatan, p.bagan_tingkat, p.bagan_offset, p.bagan_layout, p.bagan_warna')
             ->select('(CASE WHEN id_pend IS NOT NULL THEN ph.foto ELSE p.foto END) as foto')
             ->select('(CASE WHEN id_pend IS NOT NULL THEN ph.nama ELSE p.pamong_nama END) as nama')
             ->from('tweb_desa_pamong p')
             ->join('penduduk_hidup ph', 'ph.id = p.id_pend', 'left')
+            ->join('ref_jabatan rj', 'rj.id = p.jabatan_id', 'left')
             ->where('pamong_status', 1)
             ->get()->result_array();
 
@@ -480,11 +562,12 @@ class Pamong_model extends CI_Model
         }
 
         return $this->db
-            ->select('pamong_id as id, jabatan')
+            ->select('pamong_id as id, rj.nama AS jabatan')
             ->select('(CASE WHEN id_pend IS NOT NULL THEN ph.nik ELSE p.pamong_nik END) as nik')
             ->select('(CASE WHEN id_pend IS NOT NULL THEN ph.nama ELSE p.pamong_nama END) as nama')
             ->from('tweb_desa_pamong p')
             ->join('penduduk_hidup ph', 'ph.id = p.id_pend', 'left')
+            ->join('ref_jabatan rj', 'rj.id = p.jabatan_id', 'left')
             ->where('pamong_status', 1)
             ->order_by('nama')
             ->get()->result_array();
@@ -521,7 +604,8 @@ class Pamong_model extends CI_Model
     {
         $kehadiranPerangkat = Kehadiran::where('pamong_id', $id)->exists();
         $kehadiranPengaduan = KehadiranPengaduan::where('id_pamong', $id)->exists();
+        $kehadiranPengaduan = LogSurat::where('id_pamong', $id)->exists();
 
-        return $kehadiranPerangkat || $kehadiranPengaduan;
+        return $kehadiranPerangkat || $kehadiranPengaduan || $kehadiranPengaduan;
     }
 }

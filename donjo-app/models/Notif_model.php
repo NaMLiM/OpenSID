@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -60,11 +60,13 @@ class Notif_model extends CI_Model
         $tgl_akhir = $response->body->tanggal_berlangganan->akhir;
 
         if (empty($tgl_akhir)) { // pemesanan bukan premium
-            foreach ($response->body->pemesanan as $pemesanan) {
-                $akhir[] = $pemesanan->tgl_akhir;
-            }
+            if ($response->body->pemesanan) {
+                foreach ($response->body->pemesanan as $pemesanan) {
+                    $akhir[] = $pemesanan->tgl_akhir;
+                }
 
-            $masa_berlaku = calculate_date_intervals($akhir);
+                $masa_berlaku = calculate_date_intervals($akhir);
+            }
         } else { // pemesanan premium
             $tgl_akhir    = strtotime($tgl_akhir);
             $masa_berlaku = round(($tgl_akhir - time()) / (60 * 60 * 24));
@@ -215,36 +217,16 @@ class Notif_model extends CI_Model
      */
     public function api_pelanggan_pemesanan()
     {
-        if (empty($token = $this->setting->layanan_opendesa_token)) {
+        if (empty($this->setting->layanan_opendesa_token)) {
             $this->session->set_userdata('error_status_langganan', 'Token Pelanggan Kosong.');
 
             return null;
         }
 
-        $host = config_item('server_layanan');
+        if ($cache = $this->cache->file->get('status_langganan')) {
+            $this->session->set_userdata('error_status_langganan', 'Tunggu sebentar, halaman akan dimuat ulang.');
 
-        // simpan cache
-        $response = $this->cache->pakai_cache(function () use ($host, $token) {
-            // request ke api layanan.opendesa.id
-            return $this->client->get(
-                "{$host}/api/v1/pelanggan/pemesanan",
-                [],
-                [
-                    CURLOPT_HTTPHEADER => [
-                        'X-Requested-With: XMLHttpRequest',
-                        "Authorization: Bearer {$token}",
-                    ],
-                ]
-            );
-        }, 'status_langganan', 24 * 60 * 60);
-
-        if ($response->header->http_code != 200) {
-            $this->cache->hapus_cache_untuk_semua('status_langganan');
-            $this->session->set_userdata('error_status_langganan', "{$response->header->http_code} {$response->body->messages->error}");
-
-            return null;
+            return $cache;
         }
-
-        return $response;
     }
 }

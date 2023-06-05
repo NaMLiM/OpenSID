@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,11 +29,13 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
  */
+
+use App\Models\Config;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -54,14 +56,16 @@ class Siteman extends MY_Controller
         // Kalau sehabis periksa data, paksa harus login lagi
         if ($this->session->periksa_data == 1) {
             $this->user_model->logout();
+
+            redirect('siteman');
         }
 
         if (isset($_SESSION['siteman']) && $_SESSION['siteman'] == 1) {
             redirect('main');
         }
         unset($_SESSION['balik_ke']);
-        $data['header']      = $this->config_model->get_data();
-        $data['latar_login'] = $this->theme_model->latar_login();
+        $data['header'] = Config::first();
+
         $data['form_action'] = site_url('siteman/auth');
         //Initialize Session ------------
         if (! isset($_SESSION['siteman'])) {
@@ -85,7 +89,7 @@ class Siteman extends MY_Controller
         $method       = $this->input->method(true);
         $allow_method = ['POST'];
         if (! in_array($method, $allow_method)) {
-            redirect('siteman/login');
+            redirect('siteman');
         }
         $this->user_model->siteman();
 
@@ -112,24 +116,16 @@ class Siteman extends MY_Controller
         }
     }
 
-    public function login()
-    {
-        $this->user_model->login();
-        $data['header']      = $this->config_model->get_data();
-        $data['form_action'] = site_url('siteman/auth');
-        $this->load->view('siteman', $data);
-    }
-
     public function logout()
     {
         $this->user_model->logout();
-        $this->index();
+
+        redirect('siteman');
     }
 
     public function lupa_sandi()
     {
-        $data['header']      = $this->config_model->get_data();
-        $data['latar_login'] = $this->theme_model->latar_login();
+        $data['header'] = Config::first();
 
         $this->load->view('lupa_sandi', $data);
     }
@@ -141,7 +137,7 @@ class Siteman extends MY_Controller
         $securimage = new Securimage();
 
         if (! $securimage->check($this->input->post('captcha_code'))) {
-            $this->session->set_flashdata('notif', 'Kode captcha anda salah. Silakan ulangi lagi.');
+            set_session('notif', 'Kode captcha anda salah. Silakan ulangi lagi.');
 
             redirect('siteman/lupa_sandi');
         }
@@ -153,12 +149,12 @@ class Siteman extends MY_Controller
         } catch (\Exception $e) {
             log_message('error', $e);
 
-            $this->session->set_flashdata('notif', 'Tidak berhasil mengirim email, harap mencoba kembali.');
+            set_session('notif', 'Tidak berhasil mengirim email, harap mencoba kembali.');
 
             redirect('siteman/lupa_sandi');
         }
 
-        $this->session->set_flashdata('notif', lang($status));
+        set_session('notif', lang($status));
 
         redirect('siteman/lupa_sandi');
     }
@@ -169,10 +165,9 @@ class Siteman extends MY_Controller
             redirect('siteman');
         }
 
-        $data['header']      = $this->config_model->get_data();
-        $data['latar_login'] = $this->theme_model->latar_login();
-        $data['email']       = $this->input->get('email', true);
-        $data['token']       = $token;
+        $data['header'] = Config::first();
+        $data['email']  = $this->input->get('email', true);
+        $data['token']  = $token;
 
         $this->load->view('reset_kata_sandi', $data);
     }
@@ -182,7 +177,7 @@ class Siteman extends MY_Controller
         $request = (object) $this->input->post();
 
         if ($request->password !== $request->konfirmasi_password) {
-            $this->session->set_flashdata('notif', 'Bidang konfirmasi password tidak cocok dengan bidang password.');
+            set_session('notif', 'Bidang konfirmasi password tidak cocok dengan bidang password.');
 
             redirect("siteman/reset_kata_sandi/{$request->token}?email={$request->email}");
         }
@@ -197,12 +192,12 @@ class Siteman extends MY_Controller
         } catch (\Exception $e) {
             log_message('error', $e);
 
-            $this->session->set_flashdata('notif', 'Tidak berhasil memverifikasi kata sandi, silahkan coba kembali.');
+            set_session('notif', 'Tidak berhasil memverifikasi kata sandi, silahkan coba kembali.');
 
             redirect("siteman/reset_kata_sandi/{$request->token}?email={$request->email}");
         }
 
-        $this->session->set_flashdata('notif', lang($status));
+        set_session('notif', lang($status));
 
         if ($status === 'reset') {
             redirect('siteman');

@@ -38,71 +38,6 @@
           <?php $this->load->view('gis/content_rw_web.php', ['rw_gis' => $rw_gis, 'list_ref' => $list_ref, 'wilayah' => ucwords($this->setting->sebutan_dusun . ' ')]) ?>
           <?php $this->load->view('gis/content_rt_web.php', ['rt_gis' => $rt_gis, 'list_ref' => $list_ref, 'wilayah' => ucwords($this->setting->sebutan_dusun . ' ')]) ?>
         </div>
-        <div id="desa_online" style="display: none;">
-          <div class="leaflet-top leaflet-right">
-            <section class="content">
-              <div class="info-box bg-yellow">
-                <span class="info-box-icon"><i class="fa fa-map-marker">
-                    <H5 class="info legend">NEGARA</H5>
-                  </i></span>
-                <div class="info-box-content">
-                  <span class="info-box-text nama_negara"></span>
-                  <div class="progress">
-                    <div class="progress-bar" style="width: 100%"></div>
-                  </div>
-                  <span class="info-box-number jml_desa"></span>
-                  <span class="progress-description"><i>Desa OpenSID Aktif</i></span>
-                </div>
-              </div>
-              <div class="info-box bg-red">
-                <span class="info-box-icon"><i class="fa fa-map-marker">
-                    <h5 class="info legend">PROV.</h5>
-                  </i></span>
-                <div class="info-box-content">
-                  <span class="info-box-text nama_prov"></span>
-                  <div class="progress">
-                    <div class="progress-bar" style="width: 100%"></div>
-                  </div>
-                  <span class="info-box-number jml_desa_prov"></span>
-                  <span class="progress-description"><i>Desa OpenSID Aktif</i></span>
-                </div>
-              </div>
-              <div class="info-box bg-green">
-                <span class="info-box-icon"><i class="fa fa-map-marker">
-                    <h5 class="info legend">KAB.</h5>
-                  </i></span>
-                <div class="info-box-content">
-                  <span class="info-box-text nama_kab"></span>
-                  <div class="progress">
-                    <div class="progress-bar" style="width: 100%"></div>
-                  </div>
-                  <span class="info-box-number jml_desa_kab"></span>
-                  <span class="progress-description"><i>Desa OpenSID Aktif</i></span>
-                </div>
-              </div>
-              <div class="info-box bg-blue">
-                <span class="info-box-icon"><i class="fa fa-map-marker">
-                    <h5 class="info legend">KEC.</h5>
-                  </i></span>
-                <div class="info-box-content">
-                  <span class="info-box-text nama_kec"></span>
-                  <div class="progress">
-                    <div class="progress-bar" style="width: 100%"></div>
-                  </div>
-                  <span class="info-box-number jml_desa_kec"></span>
-                  <span class="progress-description"><i>Desa OpenSID Aktif</i></span>
-                </div>
-              </div>
-            </section>
-          </div>
-        </div>
-        <div class="leaflet-top leaflet-right">
-          <div id="covid_status_local" style="display: none;">
-            <?php if ($this->setting->covid_desa) {
-    $this->load->view('gis/covid_peta_local.php');
-} ?>
-          </div>
-        </div>
         <div class="leaflet-bottom leaflet-left">
           <div id="qrcode">
             <div class="panel-body-lg">
@@ -169,8 +104,13 @@
         var zoom = 10;
       <?php endif; ?>
 
+      var options = {
+        maxZoom: <?= setting('max_zoom_peta') ?>,
+        minZoom: <?= setting('min_zoom_peta') ?>,
+      };
+
       //Inisialisasi tampilan peta
-      var mymap = L.map('map').setView(posisi, zoom);
+      var mymap = L.map('map', options).setView(posisi, zoom);
 
       <?php if (! empty($desa['path'])) : ?>
         mymap.fitBounds(<?= $desa['path'] ?>);
@@ -210,13 +150,11 @@
         set_marker_content(marker_rt, '<?= addslashes(json_encode($rt_gis)) ?>', 'RT', 'rt', '#isi_popup_rt_', '<?= favico_desa() ?>');
       <?php endif; ?>
 
-
-
       //Menampilkan overlayLayers Peta Semua Wilayah
       var overlayLayers = overlayWil(marker_desa, marker_dusun, marker_rw, marker_rt, "<?= ucwords($this->setting->sebutan_desa) ?>", "<?= ucwords($this->setting->sebutan_dusun) ?>", true);
 
       //Menampilkan BaseLayers Peta
-      var baseLayers = getBaseLayers(mymap, '<?= $this->setting->mapbox_key ?>');
+      var baseLayers = getBaseLayers(mymap, "<?= setting('mapbox_key') ?>", "<?= setting('jenis_peta') ?>");
 
       //Geolocation IP Route/GPS
       geoLocation(mymap);
@@ -271,82 +209,23 @@
         }
       });
 
+      // deklrasi variabel agar mudah di baca
+			var all_area = '<?= addslashes(json_encode($area)) ?>';
+			var all_garis = '<?= addslashes(json_encode($garis)) ?>';
+			var all_lokasi = '<?= addslashes(json_encode($lokasi)) ?>';
+			var all_lokasi_pembangunan = '<?= addslashes(json_encode($lokasi_pembangunan)) ?>';
+			var LOKASI_SIMBOL_LOKASI = '<?= base_url(LOKASI_SIMBOL_LOKASI) ?>';
+			var favico_desa = '<?= favico_desa() ?>';
+			var LOKASI_FOTO_AREA = '<?= base_url(LOKASI_FOTO_AREA) ?>';
+			var LOKASI_FOTO_GARIS = '<?= base_url(LOKASI_FOTO_GARIS) ?>';
+			var LOKASI_FOTO_LOKASI = '<?= base_url(LOKASI_FOTO_LOKASI) ?>';
+			var LOKASI_GALERI = '<?= base_url(LOKASI_GALERI) ?>';
+			var info_pembangunan = '<?= site_url('pembangunan') ?>';
+			var all_persil = '<?= addslashes(json_encode($persil)) ?>';
+      var TAMPIL_LUAS = <?= setting('tampil_luas_peta') ?>
+
       // Menampilkan OverLayer Area, Garis, Lokasi plus Lokasi Pembangunan
-      var layerCustom = tampilkan_layer_area_garis_lokasi_plus(mymap, '<?= addslashes(json_encode($area)) ?>', '<?= addslashes(json_encode($garis)) ?>', '<?= addslashes(json_encode($lokasi)) ?>', '<?= addslashes(json_encode($lokasi_pembangunan)) ?>', '<?= base_url() . LOKASI_SIMBOL_LOKASI ?>', "<?= favico_desa() ?>", '<?= base_url() . LOKASI_FOTO_AREA ?>', '<?= base_url() . LOKASI_FOTO_GARIS ?>', '<?= base_url() . LOKASI_FOTO_LOKASI ?>', '<?= base_url() . LOKASI_GALERI ?>', '<?= site_url('pembangunan/') ?>');
-
-      // Menampilkan OverLayer Covid dan Desa Pengguna OpenSID
-      var mylayer = L.featureGroup();
-      var layer_desa = L.featureGroup();
-      var layer_desa_sid = {
-        "Desa Pengguna OpenSID": layer_desa
-      }
-
-      mylayer.on('add', function() {
-        setTimeout(function() {
-          var bounds = new L.LatLngBounds();
-          if (mylayer instanceof L.FeatureGroup) {
-            bounds.extend(mylayer.getBounds());
-            mark_covid = L.marker([<?= $desa['lat'] . ',' . $desa['lng'] ?>]).addTo(mymap)
-              .bindTooltip(<?= json_encode(ucwords($this->setting->sebutan_desa . ' ' . $desa['nama_desa'])) ?> + ' berada di lokasi ini', {
-                direction: 'top'
-              });
-          }
-          if (bounds.isValid()) {
-            mymap.fitBounds(bounds);
-          } else {
-            <?php if (! empty($desa['path'])) : ?>
-              mymap.fitBounds(<?= $desa['path'] ?>);
-            <?php endif; ?>
-          }
-          $('#covid_status').show();
-          $('#covid_status_local').show();
-        });
-      });
-
-      mylayer.on('remove', function() {
-        setTimeout(function() {
-          mymap.removeLayer(mark_covid);
-          $('#covid_status').hide();
-          $('#covid_status_local').hide();
-          <?php if (! empty($desa['path'])) : ?>
-            mymap.fitBounds(<?= $desa['path'] ?>);
-          <?php endif; ?>
-        });
-      });
-
-      //loading Peta Desa Pengguna OpenSID (Data dari API Server)
-      pantau_desa(layer_desa, '<?= config_item('server_pantau'); ?>', <?= json_encode($desa['kode_desa']) ?>, "<?= favico_desa() ?>", "<?= config_item('token_pantau'); ?>");
-
-      layer_desa.on('add', function() {
-        setTimeout(function() {
-          var bounds = new L.LatLngBounds();
-          if (layer_desa instanceof L.FeatureGroup) {
-            bounds.extend(layer_desa.getBounds());
-            mark_desa = L.marker([<?= $desa['lat'] . ',' . $desa['lng'] ?>]).addTo(mymap)
-              .bindTooltip(<?= json_encode(ucwords($this->setting->sebutan_desa . ' ' . $desa['nama_desa'])) ?> + ' berada di lokasi ini', {
-                direction: 'top'
-              });
-          }
-          if (bounds.isValid()) {
-            mymap.fitBounds(bounds);
-          } else {
-            <?php if (! empty($desa['path'])) : ?>
-              mymap.fitBounds(<?= $desa['path'] ?>);
-            <?php endif; ?>
-          }
-          $('#desa_online').show();
-        });
-      });
-
-      layer_desa.on('remove', function() {
-        setTimeout(function() {
-          $('#desa_online').hide();
-          mymap.removeLayer(mark_desa);
-          <?php if (! empty($desa['path'])) : ?>
-            mymap.fitBounds(<?= $desa['path'] ?>);
-          <?php endif; ?>
-        });
-      });
+      var layerCustom = tampilkan_layer_area_garis_lokasi_plus(mymap, all_area, all_garis, all_lokasi, all_lokasi_pembangunan, LOKASI_SIMBOL_LOKASI, favico_desa, LOKASI_FOTO_AREA, LOKASI_FOTO_GARIS, LOKASI_FOTO_LOKASI, LOKASI_GALERI, info_pembangunan, all_persil, TAMPIL_LUAS);
 
       L.control.layers(baseLayers, overlayLayers, {
         position: 'topleft',
@@ -354,10 +233,6 @@
       }).addTo(mymap);
       L.control.groupedLayers('', layerCustom, {
         groupCheckboxes: true,
-        position: 'topleft',
-        collapsed: true
-      }).addTo(mymap);
-      L.control.layers('', layer_desa_sid, {
         position: 'topleft',
         collapsed: true
       }).addTo(mymap);

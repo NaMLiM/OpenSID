@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -429,7 +429,7 @@ class Mandiri_model extends CI_Model
         } else {
             $respon = [
                 'status' => -1,
-                'pesan'  => "Mohon Maaf, pendaftaran anda tidak dapat di proses. Silahkan periksa {$this->upload->display_errors()}",
+                'pesan'  => 'Mohon Maaf, pendaftaran anda tidak dapat di proses. Silahkan periksa kembali unggahan anda.',
             ];
             $this->session->set_flashdata('info_pendaftaran', $respon);
 
@@ -439,7 +439,7 @@ class Mandiri_model extends CI_Model
 
     protected function upload_scan($key = 1)
     {
-        $this->load->library('upload');
+        $this->load->library('MY_Upload', null, 'upload');
         $this->uploadConfig = [
             'upload_path'   => LOKASI_PENDAFTARAN,
             'allowed_types' => 'gif|jpg|jpeg|png',
@@ -465,8 +465,7 @@ class Mandiri_model extends CI_Model
         }
         // Upload gagal
         else {
-            $this->session->success   = -1;
-            $this->session->error_msg = $this->upload->display_errors(null, null);
+            session_error($this->upload->display_errors());
         }
 
         return (! empty($uploadData)) ? $uploadData['file_name'] : null;

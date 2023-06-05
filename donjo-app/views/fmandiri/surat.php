@@ -63,7 +63,7 @@ defined('BASEPATH') || exit('No direct script access allowed');
 						<tr>
 							<th>No</th>
 							<th>Aksi</th>
-							<th>No Antrian</th>
+							<th>No Antrean</th>
 							<th>Jenis Surat</th>
 							<th>Tanggal Kirim</th>
 						</tr>
@@ -85,12 +85,18 @@ defined('BASEPATH') || exit('No direct script access allowed');
 											<a class="btn btn-social btn-success btn-sm btn-proses" title="Surat <?= $data['status']; ?>" style="width: 170px"><i class="fa fa-check"></i><?= $data['status']; ?></a>
 										<?php else : ?>
 											<a class="btn btn-social btn-danger btn-sm btn-proses" title="Surat <?= $data['status']; ?>" style="width: 170px"><i class="fa fa-times"></i><?= $data['status']; ?></a>
+
+											<button title="Keterangan" class="btn bg-orange btn-sm keterangan" data-toggle="popover" data-trigger="focus" data-content="<?= $data['alasan']; ?>"><i class="fa fa-info-circle"></i></button>
+
 										<?php endif; ?>
 										<?php if (in_array($data['status_id'], ['0', '1'])) : ?>
 											<a href="<?= site_url(MANDIRI . "/surat/proses/{$data['id']}"); ?>" title="Batalkan Surat" class="btn bg-maroon btn-sm"><i class="fa fa-times"></i></a>
 										<?php endif; ?>
 										<?php if ($data['no_antrian'] && $this->cek_anjungan && $printer) : ?>
-											<a href="<?= site_url(MANDIRI . "/surat/cetak_no_antrian/{$data['no_antrian']}"); ?>" class="btn btn-social btn-sm bg-navy" title="Cetak No Antrian"><i class="fa fa-print"></i>No Antrian</a>
+											<a href="<?= site_url(MANDIRI . "/surat/cetak_no_antrian/{$data['no_antrian']}"); ?>" class="btn btn-social btn-sm bg-navy" title="Cetak No. Antrean"><i class="fa fa-print"></i>No. Antrean</a>
+										<?php endif ?>
+										<?php if ($cek_anjungan['tipe'] == 1 && $data['status_id'] == 3 && $data['tte']) : ?>
+											<a href="<?= site_url("layanan-mandiri/surat/cetak/{$data['id_log']}"); ?>" class="btn btn-flat bg-fuchsia btn-sm" title="Cetak Surat PDF" target="_blank"><i class="fa fa-file-pdf-o"></i></a>
 										<?php endif ?>
 									</td>
 									<td class="padat"><?= get_antrian($data['no_antrian']) ?? '-'; ?></td>
@@ -107,6 +113,7 @@ defined('BASEPATH') || exit('No direct script access allowed');
 							<th>No</th>
 							<th>Nomor Surat</th>
 							<th>Jenis Surat</th>
+							<th>Aksi</th>
 							<th>Ditandatangani Oleh</th>
 							<th>Tanggal</th>
 						</tr>
@@ -117,6 +124,11 @@ defined('BASEPATH') || exit('No direct script access allowed');
 								<td class="padat"><?= ($key + 1); ?></td>
 								<td class="padat"><?= $data['no_surat']; ?></td>
 								<td class="padat"><?= $data['format']; ?></td>
+								<td class="padat">
+									<?php if ($cek_anjungan['tipe'] == 1 && $data['tte']) : ?>
+										<a href="<?= site_url("layanan-mandiri/surat/cetak/{$data['id']}"); ?>" class="btn btn-flat bg-fuchsia btn-sm" title="Cetak Surat PDF" target="_blank"><i class="fa fa-file-pdf-o"></i></a>
+									<?php endif ?>
+								</td>
 								<td><?= $data['pamong_nama']; ?></td>
 								<td class="padat"><?= tgl_indo2($data['tanggal']); ?></td>
 							</tr>
@@ -157,5 +169,10 @@ defined('BASEPATH') || exit('No direct script access allowed');
 				cell.innerHTML = i + 1;
 			});
 		}).draw();
+
+		$('button.keterangan').click(function(event) {
+			$(this).popover('show');
+		});
+
 	});
 </script>

@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -37,40 +37,43 @@
 
 $config = [
     'desa' => [
-        'desa/arsip/'                     => [0775, 'htaccess2'],
-        'desa/cache/'                     => [0775],
-        'desa/config/'                    => [0775],
-        'desa/logo/'                      => [0775, 'htaccess1'],
-        'desa/pengaturan/'                => [0775],
-        'desa/pengaturan/siteman/'        => [0775],
-        'desa/pengaturan/siteman/images/' => [0775],
-        'desa/template-surat/'            => [0775],
-        'desa/themes/'                    => [0775],
-        'desa/upload/'                    => [0775, 'htaccess1'],
-        'desa/upload/artikel/'            => [0775, 'htaccess1'],
-        'desa/upload/dokumen/'            => [0775, 'htaccess2'],
-        'desa/upload/galeri/'             => [0775, 'htaccess1'],
-        'desa/upload/gis/'                => [0775, 'htaccess1'],
-        'desa/upload/gis/area/'           => [0775, 'htaccess1'],
-        'desa/upload/gis/garis/'          => [0775, 'htaccess1'],
-        'desa/upload/gis/lokasi/'         => [0775, 'htaccess1'],
-        'desa/upload/gis/lokasi/point/'   => [0775, 'htaccess1'],
-        'desa/upload/media/'              => [0775, 'htaccess1'],
-        'desa/upload/pendaftaran/'        => [0775, 'htaccess1'],
-        'desa/upload/pengaduan/'          => [0775, 'htaccess1'],
-        'desa/upload/pengesahan/'         => [0775, 'htaccess1'],
-        'desa/upload/produk/'             => [0775, 'htaccess1'],
-        'desa/upload/sinkronisasi/'       => [0775, 'htaccess1'],
-        'desa/upload/thumbs/'             => [0775, 'htaccess1'],
-        'desa/upload/user_pict/'          => [0775, 'htaccess1'],
-        'desa/upload/vaksin/'             => [0775, 'htaccess1'],
-        'desa/upload/widgets/'            => [0775, 'htaccess1'],
-        'desa/widgets/'                   => [0775],
+        LOKASI_ARSIP               => [0775, 'htaccess2'],
+        LOKASI_CACHE               => [0775],
+        LOKASI_CONFIG_DESA         => [0775],
+        LOKASI_LOGO_DESA           => [0775, 'htaccess1'],
+        'desa/pengaturan/'         => [0775],
+        'desa/pengaturan/siteman/' => [0775],
+        LATAR_LOGIN                => [0775],
+        LOKASI_SURAT_DESA          => [0775],
+        LOKASI_LAMPIRAN_SURAT_DESA => [0775],
+        LOKASI_TEMA_DESA           => [0775],
+        LOKASI_UPLOAD              => [0775, 'htaccess1'],
+        LOKASI_FOTO_ARTIKEL        => [0775, 'htaccess1'],
+        LOKASI_DOKUMEN             => [0775, 'htaccess2'],
+        LOKASI_GALERI              => [0775, 'htaccess1'],
+        'desa/upload/gis/'         => [0775, 'htaccess1'],
+        LOKASI_FOTO_AREA           => [0775, 'htaccess1'],
+        LOKASI_FOTO_GARIS          => [0775, 'htaccess1'],
+        LOKASI_FOTO_LOKASI         => [0775, 'htaccess1'],
+        LOKASI_SIMBOL_LOKASI       => [0775, 'htaccess1'],
+        LOKASI_MEDIA               => [0775, 'htaccess1'],
+        'desa/upload/pendaftaran/' => [0775, 'htaccess1'],
+        LOKASI_PENGADUAN           => [0775, 'htaccess1'],
+        LOKASI_PENGESAHAN          => [0775, 'htaccess1'],
+        LOKASI_PRODUK              => [0775, 'htaccess1'],
+        LOKASI_SINKRONISASI_ZIP    => [0775, 'htaccess1'],
+        'desa/upload/thumbs/'      => [0775, 'htaccess1'],
+        LOKASI_USER_PICT           => [0775, 'htaccess1'],
+        LOKASI_VAKSIN              => [0775, 'htaccess1'],
+        LOKASI_GAMBAR_WIDGET       => [0775, 'htaccess1'],
+        LOKASI_FOTO_DTKS           => [0775, 'htaccess1'],
+        LOKASI_WIDGET              => [0775],
     ],
 
     'lainnya' => [
-        'storage/framework/' => [0775],
-        'storage/logs/'      => [0775],
+        'storage/framework/'  => [0775],
+        'storage/logs/'       => [0775],
+        'backup_inkremental/' => [0775],
     ],
 
     'config' => <<<'EOS'
@@ -154,6 +157,7 @@ $config = [
         <html>
         <head>
             <title>Offline Mode - <?= ucwords($this->setting->sebutan_desa).' '.$main['nama_desa'] ?></title>
+            <link rel="shortcut icon" href="<?= favico_desa() ?>"/>
         </head>
         <body>
             <br/><br/><br/>
@@ -171,6 +175,8 @@ $config = [
                 </p>
                 <p>
                     <?= ucwords($pamong_kades['jabatan']).' '.$main['nama_desa'] ?>
+                    <br>
+                    <br>
                     <br>
                     <u><b><?= $main['nama_kepala_desa'] ?></b></u><br>
                     NIP. <?= $main['nip_kepala_desa'] ?>
@@ -197,7 +203,6 @@ $config = [
         *
         */
         body.login{
-        background: url(images/latar_login.jpg) no-repeat center fixed; /*gambar background */
             background-size: cover;
             -webkit-background-size: cover;
             -moz-background-size: cover;
@@ -227,7 +232,6 @@ $config = [
         *
         */
         body.login{
-        background: url(images/latar_login.jpg) no-repeat center fixed; /*gambar background */
             background-size: cover;
             -webkit-background-size: cover;
             -moz-background-size: cover;

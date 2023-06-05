@@ -15,11 +15,9 @@
     <link rel="shortcut icon" href="<?= favico_desa() ?>" />
 
     <style type="text/css">
-        <?php if ($latar_login) : ?>body.login {
-            background-image: url('<?= base_url($latar_login) ?>');
+        body.login {
+            background-image: url('<?= default_file(LATAR_SITEMAN, DEFAULT_LATAR_SITEMAN) ?>');
         }
-
-        <?php endif ?>
     </style>
     <script src="<?= asset('bootstrap/js/jquery.min.js') ?>"></script>
     <script src="<?= asset('js/jquery.validate.min.js') ?>"></script>
@@ -60,7 +58,7 @@
                                     </a>
                                 </div>
                                 <div class="form-group captcha">
-                                    <input name="captcha_code" type="text" class="form-control" maxlength="6" placeholder="Isikan jawaban" required />
+                                    <input name="captcha_code" type="text" class="form-control" maxlength="6" placeholder="Isikan jawaban" autocomplete="off" required />
                                 </div>
                                 <div class="form-group">
                                     <button type="submit" class="btn">Kirim Lupa Sandi</button>

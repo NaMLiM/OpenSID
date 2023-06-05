@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -38,6 +38,12 @@
 defined('BASEPATH') || exit('No direct script access allowed');
 
 use App\Libraries\FlxZipArchive;
+use App\Models\LogBackup;
+use App\Models\LogRestoreDesa;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
+use Symfony\Component\Process\Process;
 
 class Database extends Admin_Controller
 {
@@ -46,6 +52,7 @@ class Database extends Admin_Controller
         parent::__construct();
         $this->load->model(['ekspor_model', 'database_model']);
         $this->load->helper('number');
+        $this->load->library('OTP/OTP_manager', null, 'otp_library');
         $this->modul_ini     = 11;
         $this->sub_modul_ini = 45;
     }
@@ -58,6 +65,9 @@ class Database extends Admin_Controller
             'form_action' => site_url('database/restore'),
             'size_folder' => byte_format(dirSize(DESAPATH)),
             'size_sql'    => byte_format(getSizeDB()->size),
+            'act_tab'     => 1,
+            'inkremental' => $this->db->table_exists('log_backup') ? LogBackup::where('status', '<', 2)->latest()->first() : null,
+            'restore'     => Schema::hasTable('log_restore_desa') ? LogRestoreDesa::where('status', '=', 0)->exists() : false,
         ];
 
         $this->load->view('database/database.tpl.php', $data);
@@ -72,33 +82,12 @@ class Database extends Admin_Controller
         $this->load->view('database/database.tpl.php', $data);
     }
 
-    public function kosongkan()
-    {
-        if (config_item('demo_mode')) {
-            redirect($this->controller);
-        }
-
-        $data['act_tab'] = 3;
-        $data['content'] = 'database/kosongkan';
-        $this->load->view('database/database.tpl.php', $data);
-    }
-
     public function migrasi_db_cri()
     {
         $this->redirect_hak_akses('u');
         $this->session->unset_userdata(['success, error_msg']);
         $this->database_model->migrasi_db_cri();
         redirect('database/migrasi_cri');
-    }
-
-    public function kosongkan_db()
-    {
-        if (config_item('demo_mode')) {
-            redirect($this->controller);
-        }
-        $this->redirect_hak_akses('h');
-        $this->database_model->kosongkan_db();
-        redirect('database/kosongkan');
     }
 
     public function exec_backup()
@@ -111,6 +100,51 @@ class Database extends Admin_Controller
         $za = new FlxZipArchive();
         $za->read_dir(DESAPATH);
         $za->download('backup_folder_desa_' . date('Y_m_d') . '.zip');
+    }
+
+    public function desa_inkremental()
+    {
+        if ($this->input->is_ajax_request()) {
+            return datatables(LogBackup::query())
+                ->addIndexColumn()
+                ->make();
+        }
+
+        return view('admin.database.inkremental');
+    }
+
+    public function inkremental_job()
+    {
+        // cek tanggal
+        // job hanya bisa dilakukan 1 hari 1 kali
+        $now    = Carbon::now()->format('Y-m-d');
+        $last   = LogBackup::where('status', '<', 2)->latest()->first();
+        $lokasi = $this->input->post('lokasi');
+
+        if ($last != null && $now == $last->created_at->format('Y-m-d')) {
+            return json([
+                'status'  => false,
+                'message' => 'Anda sudah melakukan Backup inkremental hari ini',
+            ]);
+        }
+
+        $process = new Process(['php', '-f', FCPATH . 'index.php', 'job', 'backup_inkremental', $lokasi]);
+        $process->disableOutput()->setOptions(['create_new_console' => true]);
+        $process->start();
+
+        return json([
+            'status'  => true,
+            'message' => 'Backup inkremental sedang berlangsung',
+        ]);
+    }
+
+    public function inkremental_download()
+    {
+        $file = LogBackup::latest()->first();
+        $file->update(['downloaded_at' => Carbon::now(), 'status' => 2]);
+        $za           = new FlxZipArchive();
+        $za->tmp_file = $file->path;
+        $za->download('backup_inkremental' . $file->created_at->format('Y_m-d') . '.zip');
     }
 
     public function restore()
@@ -184,5 +218,152 @@ class Database extends Admin_Controller
         $hasil = $this->sinkronisasi_model->sinkronkan();
         status_sukses($hasil);
         redirect($_SERVER['HTTP_REFERER']);
+    }
+
+    public function batal_backup()
+    {
+        $this->load->library('job_prosess');
+        // ambil semua data pid yang masih dalam prosess
+        $last_backup = LogBackup::where('status', '=', 0)->get();
+
+        foreach ($last_backup as $key => $value) {
+            $this->job_prosess->kill($value->pid_process);
+            $value->status = 3;
+            $value->save();
+        }
+        redirect($this->controller);
+    }
+
+    public function kirim_otp()
+    {
+        $method = $this->input->post('method');
+        //cek verifikasi
+
+        if (! in_array($method, ['telegram', 'email'])) {
+            return json([
+                'status'  => false,
+                'message' => 'Metode tidak ditemukan',
+            ]);
+        }
+        $user = User::when($method == 'telegram', static fn ($query) => $query->whereNotNull('telegram_verified_at'))
+            ->when($method == 'email', static fn ($query) => $query->whereNotNull('email_verified_at'))
+            ->first();
+
+        if ($user == null) {
+            return json([
+                'status'  => false,
+                'message' => "{$method} belum terverifikasi",
+            ]);
+        }
+
+        try {
+            $token           = hash('sha256', $raw_token = mt_rand(100000, 999999));
+            $user->token     = $token;
+            $user->token_exp = date('Y-m-d H:i:s', strtotime(date('Y-m-d H:i:s') . ' +5 minutes'));
+            $user->save();
+            if ($method == 'telegram') {
+                $this->otp_library->driver('telegram')->kirim_otp($user->id_telegram, $raw_token);
+            } else {
+                $this->otp_library->driver('email')->kirim_otp($user->email, $raw_token);
+            }
+
+            return json([
+                'status'  => true,
+                'message' => "OTP sudah Terkirim ke {$method}",
+            ]);
+        } catch (Exception $e) {
+            return json([
+                'status'   => false,
+                'messages' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function verifikasi_otp()
+    {
+        $otp = $this->input->post('otp');
+
+        if ($otp == '') {
+            return json([
+                'status'  => false,
+                'message' => 'kode otp kosong',
+            ]);
+        }
+
+        $verifikasi_otp = User::where('id', '=', $this->session->user)
+            ->where('token_exp', '>', date('Y-m-d H:i:s'))
+            ->where('token', '=', hash('sha256', $otp))
+            ->first();
+
+        if ($verifikasi_otp == null) {
+            return json([
+                'status'  => false,
+                'message' => 'kode otp Salah',
+            ]);
+        }
+
+        return json([
+            'status'  => true,
+            'message' => 'Verifikasi berhasil',
+        ]);
+    }
+
+    public function upload_restore()
+    {
+        $this->load->library('upload');
+        $this->uploadConfig = [
+            'upload_path'   => sys_get_temp_dir(),
+            'allowed_types' => 'zip',
+            'file_ext'      => 'zip',
+            'max_size'      => max_upload() * 1024,
+        ];
+        $this->upload->initialize($this->uploadConfig);
+
+        try {
+            if (! $this->upload->do_upload('file')) {
+                return json([
+                    'status'  => true,
+                    'message' => $this->upload->display_errors(null, null) . ': ' . $this->upload->file_type,
+                ]);
+            }
+            $uploadData = $this->upload->data();
+            $filename   = $this->uploadConfig['upload_path'] . '/' . $uploadData['file_name'];
+
+            $id = LogRestoreDesa::create([
+                'ukuran'     => $uploadData['file_name'],
+                'path'       => $uploadData['full_path'],
+                'restore_at' => date('Y-m-d H:i:s'),
+                'status'     => 0,
+                'created_by' => $this->session->user,
+            ])->id;
+
+            $process = new Process(['php', '-f', FCPATH . 'index.php', 'job', 'restore_desa', $id]);
+            $process->disableOutput()->setOptions(['create_new_console' => true]);
+            $process->start();
+
+            return json([
+                'status'  => true,
+                'message' => 'upload file berhasil. restore dijalankan melalui job background',
+            ]);
+        } catch (Exception $e) {
+            return json([
+                'status'   => false,
+                'messages' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function batal_restore()
+    {
+        $this->load->library('job_prosess');
+        // ambil semua data pid yang masih dalam prosess
+        $last_restore = LogRestoreDesa::where('status', '=', 0)->get();
+
+        foreach ($last_restore as $key => $value) {
+            $this->job_prosess->kill($value->pid_process);
+            $value->status = 3;
+            $value->save();
+        }
+        redirect($this->controller);
     }
 }

@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,11 +29,13 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
  */
+
+use App\Models\Pengaduan as PengaduanModel;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -83,33 +85,50 @@ class Pengaduan extends Web_Controller
         $post = $this->input->post();
         if ($securimage->check($post['captcha_code']) == false) {
             $notif = [
-                'status' => 'danger',
+                'status' => 'error',
                 'pesan'  => 'Kode captcha anda salah. Silakan ulangi lagi.',
                 'data'   => $post,
             ];
+        } elseif (empty($this->input->ip_address())) {
+            $notif = [
+                'status' => 'error',
+                'pesan'  => 'Pengaduan gagal dikirim. IP Address anda tidak dikenali.',
+            ];
         } else {
-            if ($this->pengaduan_model->insert()) {
-                if (! empty($this->setting->telegram_token) && cek_koneksi_internet()) {
-                    try {
-                        $this->telegram->sendMessage([
-                            'text'       => 'Halo! Ada pengaduan baru dari warga, mohon untuk segera ditindak lanjuti. Terima kasih.',
-                            'parse_mode' => 'Markdown',
-                            'chat_id'    => $this->setting->telegram_user_id,
-                        ]);
-                    } catch (Exception $e) {
-                        log_message('error', $e->getMessage());
-                    }
-                }
+            // Cek pengaduan dengan ip_address yang pada hari yang sama
+            $cek = PengaduanModel::where('ip_address', '=', $this->input->ip_address())
+                ->whereDate('created_at', date('Y-m-d'))
+                ->exists();
+
+            if ($cek) {
                 $notif = [
-                    'status' => 'success',
-                    'pesan'  => 'Pengaduan berhasil dikirim.',
+                    'status' => 'error',
+                    'pesan'  => 'Pengaduan gagal dikirim. Anda hanya dapat mengirimkan satu pengaduan dalam satu hari.',
                 ];
             } else {
-                $notif = [
-                    'status' => 'danger',
-                    'pesan'  => 'Pengaduan gagal dikirim.',
-                    'data'   => $post,
-                ];
+                if ($this->pengaduan_model->insert()) {
+                    if (! empty($this->setting->telegram_token) && cek_koneksi_internet()) {
+                        try {
+                            $this->telegram->sendMessage([
+                                'text'       => 'Halo! Ada pengaduan baru dari warga, mohon untuk segera ditindak lanjuti. Terima kasih.',
+                                'parse_mode' => 'Markdown',
+                                'chat_id'    => $this->setting->telegram_user_id,
+                            ]);
+                        } catch (Exception $e) {
+                            log_message('error', $e->getMessage());
+                        }
+                    }
+                    $notif = [
+                        'status' => 'success',
+                        'pesan'  => 'Pengaduan berhasil dikirim.',
+                    ];
+                } else {
+                    $notif = [
+                        'status' => 'error',
+                        'pesan'  => 'Pengaduan gagal dikirim.',
+                        'data'   => $post,
+                    ];
+                }
             }
         }
 

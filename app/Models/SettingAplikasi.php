@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -37,9 +37,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Enums\StatusEnum;
+use App\Models\Galery as Galeri;
 
-class SettingAplikasi extends Model
+defined('BASEPATH') || exit('No direct script access allowed');
+
+class SettingAplikasi extends BaseModel
 {
     /**
      * The table associated with the model.
@@ -56,6 +59,13 @@ class SettingAplikasi extends Model
     public $timestamps = false;
 
     /**
+     * Indicates if the model's ID is auto-incrementing.
+     *
+     * @var bool
+     */
+    public $incrementing = false;
+
+    /**
      * The fillable with the model.
      *
      * @var array
@@ -64,4 +74,41 @@ class SettingAplikasi extends Model
         'key',
         'value',
     ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'option' => 'json',
+    ];
+
+    public function getOptionAttribute()
+    {
+        if ($this->attributes['jenis'] == 'option' && $this->attributes['key'] == 'web_theme') {
+            // TODO : Akan dipindahkan ke modul tema
+            $list_tema  = [];
+            $tema_semua = array_merge(glob('vendor/themes/*', GLOB_ONLYDIR), glob('desa/themes/*', GLOB_ONLYDIR));
+
+            foreach ($tema_semua as $tema) {
+                if (is_file(FCPATH . $tema . '/template.php')) {
+                    $list_tema[] = str_replace(['vendor/', 'themes/'], '', $tema);
+                }
+            }
+
+            return array_combine($list_tema, $list_tema);
+        }
+        if ($this->attributes['jenis'] == 'option' && $this->attributes['key'] == 'tampilan_anjungan_slider') {
+            return Galeri::whereParrent(Galeri::PARRENT)->whereEnabled(StatusEnum::YA)->pluck('nama', 'id');
+        }
+        if ($this->attributes['jenis'] == 'boolean') {
+            return [
+                1 => 'Ya',
+                0 => 'Tidak',
+            ];
+        }
+
+        return json_decode($this->attributes['option'], true);
+    }
 }

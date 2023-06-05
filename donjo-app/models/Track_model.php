@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -44,6 +44,8 @@ use App\Models\Penduduk;
 use App\Models\PendudukMandiri;
 use App\Models\Persil;
 use App\Models\User;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -61,39 +63,46 @@ class Track_model extends CI_Model
         }
         // Track web dan admin masing2 maksimum sekali sehari
         if (strpos(current_url(), 'first') !== false) {
-            if (isset($_SESSION['track_web']) && $_SESSION['track_web'] == date('Y m d')) {
+            if ($this->session->has_userdata('track_web') && $this->session->track_web == date('Y m d')) {
                 return;
             }
         } else {
-            if (isset($_SESSION['track_admin']) && $_SESSION['track_admin'] == date('Y m d')) {
+            if ($this->session->has_userdata('track_admin') && $this->session->track_admin == date('Y m d')) {
                 return;
             }
         }
 
-        $_SESSION['balik_ke'] = $dari;
+        $this->session->set_userdata('balik_ke', $dari);
         $this->kirim_data();
     }
 
     public function kirim_data()
     {
-        // Jangan kirim data ke pantau jika versi demo
-        if (config_item('demo_mode')) {
+        /**
+         * Jangan kirim data ke pantau jika versi demo
+         * cegah error karena tabel belum ada
+         */
+        if (config_item('demo_mode') || ! $this->db->field_exists('deleted_at', 'log_surat')) {
+            return;
+        }
+
+        if (! $this->db->field_exists('deleted_at', 'log_surat')) { // cegah error karena tabel belum ada
             return;
         }
 
         if (defined('ENVIRONMENT')) {
             switch (ENVIRONMENT) {
-            case 'development':
-                // Jangan kirim data ke pantau jika versi development
-                return;
+                case 'development':
+                    // Jangan kirim data ke pantau jika versi development
+                    return;
 
-            case 'testing':
-            case 'production':
-                $tracker = config_item('server_pantau');
-                break;
+                case 'testing':
+                case 'production':
+                    $tracker = config_item('server_pantau');
+                    break;
 
-            default:
-                exit('The application environment is not set correctly.');
+                default:
+                    exit('The application environment is not set correctly.');
             }
         }
 
@@ -120,25 +129,45 @@ class Track_model extends CI_Model
             'version'             => AmbilVersi(),
             'jml_penduduk'        => Penduduk::status(1)->count(),
             'jml_artikel'         => Artikel::count(),
-            'jml_surat_keluar'    => LogSurat::count(),
+            'jml_surat_keluar'    => LogSurat::whereNull('deleted_at')->count(),
             'jml_peserta_bantuan' => BantuanPeserta::count(),
             'jml_mandiri'         => PendudukMandiri::count(),
             'jml_pengguna'        => User::count(),
             'jml_unsur_peta'      => $this->jml_unsur_peta(),
             'jml_persil'          => Persil::count(),
             'jml_dokumen'         => Dokumen::hidup()->count(),
+            'jml_surat_tte'       => LogSurat::whereNull('deleted_at')->where('tte', '=', 1)->count(), // jumlah surat terverifikasi secara tte
+            'modul_tte'           => (LogSurat::whereNull('deleted_at')->where('tte', '=', 1)->count() > 0 && setting('tte') == 1) ? 1 : 0, // cek modul tte
         ];
 
         if ($this->abaikan($desa)) {
             return;
         }
 
-        $trackSID_output = httpPost($tracker . '/index.php/api/track/desa?token=' . config_item('token_pantau'), $desa);
-        $this->cek_notifikasi_TrackSID($trackSID_output);
+        try {
+            $response = (new Client())->post("{$tracker}/api/track/desa", [
+                'headers' => [
+                    'X-Requested-With' => 'XMLHttpRequest',
+                    'Authorization'    => 'Bearer ' . config_item('token_pantau'),
+                ],
+                'form_params' => $desa,
+            ]);
+        } catch (ClientException $cx) {
+            log_message('error', $cx);
+
+            return;
+        } catch (Exception $e) {
+            log_message('error', $e);
+
+            return;
+        }
+
+        $this->cek_notifikasi_TrackSID($response->getBody()->getContents());
+
         if (strpos(current_url(), 'first') !== false) {
-            $_SESSION['track_web'] = date('Y m d');
+            $this->session->set_userdata('track_web', date('Y m d'));
         } else {
-            $_SESSION['track_admin'] = date('Y m d');
+            $this->session->set_userdata('track_admin', date('Y m d'));
         }
     }
 
@@ -146,18 +175,26 @@ class Track_model extends CI_Model
     {
         if (! empty($trackSID_output)) {
             $array_output = json_decode($trackSID_output, true);
+            $this->load->model('notif_model');
 
             foreach ($array_output as $notif) {
-                unset($notif['id']);
-                $notif['tgl_berikutnya'] = date('Y-m-d H:i:s');
-                $notif['updated_by']     = 0;
-                $notif['aksi_ya']        = $this->aksi_valid($notif['aksi_ya']) ?: 'notif/update_pengumuman';
-                $notif['aksi_tidak']     = $this->aksi_valid($notif['aksi_tidak']) ?: 'notif/update_pengumuman';
-                $notif['aksi']           = $notif['aksi_ya'] . ',' . $notif['aksi_tidak'];
-                unset($notif['aksi_ya'], $notif['aksi_tidak']);
+                $notif['aksi_ya']    = $this->aksi_valid($notif['aksi_ya']) ?: 'notif/update_pengumuman';
+                $notif['aksi_tidak'] = $this->aksi_valid($notif['aksi_tidak']) ?: 'notif/update_pengumuman';
+                $notif['aksi']       = $notif['aksi_ya'] . ',' . $notif['aksi_tidak'];
 
-                $this->load->model('notif_model');
-                $this->notif_model->insert_notif($notif);
+                $this->notif_model->insert_notif([
+                    'kode'           => $notif['kode'],
+                    'judul'          => $notif['judul'],
+                    'jenis'          => $notif['jenis'],
+                    'isi'            => $notif['isi'],
+                    'server'         => $notif['server'],
+                    'tgl_berikutnya' => date('Y-m-d H:i:s'),
+                    'updated_at'     => date('Y-m-d H:i:s'),
+                    'updated_by'     => 0,
+                    'frekuensi'      => $notif['frekuensi'],
+                    'aksi'           => $notif['aksi_ya'] . ',' . $notif['aksi_tidak'],
+                    'aktif'          => $notif['aktif'],
+                ]);
             }
         }
     }

@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -114,7 +114,7 @@ class First extends Web_Controller
     | Artikel bisa ditampilkan menggunakan parameter pertama sebagai id, dan semua parameter lainnya dikosongkan. url artikel/:id
     | Kalau menggunakan slug, dipanggil menggunakan url artikel/:thn/:bln/:hri/:slug
     */
-    public function artikel($url)
+    public function artikel($thn, $bln, $hr, $url)
     {
         if (is_numeric($url)) {
             $data_artikel = $this->first_artikel_m->get_artikel_by_id($url);
@@ -126,7 +126,7 @@ class First extends Web_Controller
         $this->load->model('shortcode_model');
         $data = $this->includes;
         $this->first_artikel_m->hit($url); // catat artikel diakses
-        $data['single_artikel'] = $this->first_artikel_m->get_artikel($url);
+        $data['single_artikel'] = $this->first_artikel_m->get_artikel($thn, $bln, $hr, $url);
         $id                     = $data['single_artikel']['id'];
 
         // replace isi artikel dengan shortcodify
@@ -305,45 +305,6 @@ class First extends Web_Controller
         $this->load->view($this->template, $data);
     }
 
-    public function peraturan_desa()
-    {
-        if (! $this->web_menu_model->menu_aktif('peraturan_desa')) {
-            show_404();
-        }
-
-        $data = $this->includes;
-
-        $data['kategori']       = $this->referensi_model->list_data('ref_dokumen', 1);
-        $data['tahun']          = $this->web_dokumen_model->tahun_dokumen();
-        $data['heading']        = 'Produk Hukum';
-        $data['title']          = $data['heading'];
-        $data['halaman_statis'] = 'web/halaman_statis/peraturan_desa';
-        $this->_get_common_data($data);
-
-        $this->set_template('layouts/halaman_statis.tpl.php');
-        $this->load->view($this->template, $data);
-    }
-
-    public function ajax_table_peraturan()
-    {
-        $kategori_dokumen = '';
-        $tahun_dokumen    = '';
-        $tentang_dokumen  = '';
-        $data             = $this->web_dokumen_model->all_peraturan($kategori_dokumen, $tahun_dokumen, $tentang_dokumen);
-        echo json_encode($data);
-    }
-
-    // function filter peraturan
-    public function filter_peraturan()
-    {
-        $kategori_dokumen = $this->input->post('kategori');
-        $tahun_dokumen    = $this->input->post('tahun');
-        $tentang_dokumen  = $this->input->post('tentang');
-
-        $data = $this->web_dokumen_model->all_peraturan($kategori_dokumen, $tahun_dokumen, $tentang_dokumen);
-        echo json_encode($data);
-    }
-
     public function informasi_publik()
     {
         if (! $this->web_menu_model->menu_aktif('informasi_publik')) {
@@ -373,11 +334,20 @@ class First extends Web_Controller
             $no++;
             $row   = [];
             $row[] = $no;
-            $row[] = "<a href='" . site_url('dokumen_web/unduh_berkas/') . $baris['id'] . "' target='_blank'>" . $baris['nama'] . '</a>';
+            if ($baris['tipe'] == 1) {
+                $row[] = "<a href='" . site_url('dokumen_web/unduh_berkas/') . $baris['id'] . "' target='_blank'>" . $baris['nama'] . '</a>';
+            } else {
+                $row[] = "<a href='" . $baris['url'] . "' target='_blank'>" . $baris['nama'] . '</a>';
+            }
             $row[] = $baris['tahun'];
             // Ambil judul kategori
-            $row[]  = $this->referensi_model->list_ref_flip(KATEGORI_PUBLIK)[$baris['kategori_info_publik']];
-            $row[]  = $baris['tgl_upload'];
+            $row[] = $this->referensi_model->list_ref_flip(KATEGORI_PUBLIK)[$baris['kategori_info_publik']];
+            $row[] = $baris['tgl_upload'];
+            if ($baris['tipe'] == 1) {
+                $row[] = "<a href='" . site_url('first/tampilkan/') . $baris['id'] . "' class='btn btn-primary btn-block pdf'>Lihat Dokumen </a>";
+            } else {
+                $row[] = "<a href='" . $baris['url'] . "' class='btn btn-primary btn-block pdf'>Lihat Dokumen </a>";
+            }
             $data[] = $row;
         }
 
@@ -387,6 +357,23 @@ class First extends Web_Controller
             'data'            => $data,
         ];
         echo json_encode($output);
+    }
+
+    public function tampilkan($id_dokumen, $id_pend = 0)
+    {
+        $this->load->model('Web_dokumen_model');
+        $berkas = $this->web_dokumen_model->get_nama_berkas($id_dokumen, $id_pend);
+
+        if (! $id_dokumen || ! $berkas || ! file_exists(LOKASI_DOKUMEN . $berkas)) {
+            $data['link_berkas'] = null;
+        } else {
+            $data = [
+                'link_berkas' => site_url("dokumen/tampilkan_berkas/{$id_dokumen}/{$id_pend}"),
+                'tipe'        => get_extension($berkas),
+                'link_unduh'  => site_url("dokumen/unduh_berkas/{$id_dokumen}/{$id_pend}"),
+            ];
+        }
+        $this->load->view('global/tampilkan', $data);
     }
 
     public function kategori($id, $p = 1)
@@ -467,40 +454,6 @@ class First extends Web_Controller
         redirect($_SERVER['HTTP_REFERER'] . '#kolom-komentar');
     }
 
-    public function peta()
-    {
-        if (! $this->web_menu_model->menu_aktif('peta')) {
-            show_404();
-        }
-
-        $this->load->model('wilayah_model');
-        $this->load->model('data_persil_model');
-        $this->load->model('pembangunan_model');
-
-        $data = $this->includes;
-
-        $data['list_dusun']         = $this->wilayah_model->list_dusun();
-        $data['wilayah']            = $this->wilayah_model->list_wil();
-        $data['desa']               = $this->config_model->get_data();
-        $data['title']              = 'Peta ' . ucwords($this->setting->sebutan_desa . ' ' . $data['desa']['nama_desa']);
-        $data['dusun_gis']          = $data['list_dusun'];
-        $data['rw_gis']             = $this->wilayah_model->list_rw();
-        $data['rt_gis']             = $this->wilayah_model->list_rt();
-        $data['list_ref']           = $this->referensi_model->list_ref(STAT_PENDUDUK);
-        $data['covid']              = $this->laporan_penduduk_model->list_data('covid');
-        $data['lokasi']             = $this->plan_lokasi_model->list_lokasi();
-        $data['garis']              = $this->plan_garis_model->list_garis();
-        $data['area']               = $this->plan_area_model->list_area();
-        $data['lokasi_pembangunan'] = $this->pembangunan_model->list_lokasi_pembangunan();
-        $data['persil']             = $this->data_persil_model->list_data();
-
-        $data['halaman_peta'] = 'web/halaman_statis/peta';
-        $this->_get_common_data($data);
-
-        $this->set_template('layouts/peta_statis.tpl.php');
-        $this->load->view($this->template, $data);
-    }
-
     public function load_apbdes()
     {
         $data['transparansi'] = $this->keuangan_grafik_model->grafik_keuangan_tema();
@@ -538,26 +491,6 @@ class First extends Web_Controller
         }
 
         $this->load->view('gis/aparatur_wilayah', $data);
-    }
-
-    public function status_idm(int $tahun)
-    {
-    }
-
-    public function status_sdgs()
-    {
-        if (! $this->web_menu_model->menu_aktif('status-sdgs')) {
-            show_404();
-        }
-
-        $this->load->model('data_eksternal_model');
-        $data = $this->includes;
-        $this->_get_common_data($data);
-        $kode_desa              = $data['desa']['kode_desa'];
-        $data['evaluasi']       = $this->data_eksternal_model->sdgs_kemendes($kode_desa);
-        $data['halaman_statis'] = '../../' . $this->theme_folder . '/' . $this->theme . '/partials/kemendes_sdgs.php';
-        $this->set_template('layouts/halaman_statis_lebar.tpl.php');
-        $this->load->view($this->template, $data);
     }
 
     public function get_form_info()

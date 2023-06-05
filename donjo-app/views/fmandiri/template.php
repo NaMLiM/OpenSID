@@ -73,8 +73,10 @@ defined('BASEPATH') || exit('No direct script access allowed');
 	<!-- AdminLTE Skins. -->
 	<link rel="stylesheet" href="<?= asset('css/skins/_all-skins.min.css') ?>">
 
+	<?php if (cek_koneksi_internet()): ?>
 	<!-- Form Wizard - smartWizard -->
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/smartwizard@5/dist/css/smart_wizard_all.min.css">
+	<?php endif ?>
 
 	<?php if ($this->controller == 'lapak') : ?>
 		<!-- Map -->
@@ -262,22 +264,22 @@ defined('BASEPATH') || exit('No direct script access allowed');
 							<?php
                             $this->load->view(MANDIRI . '/' . $konten);
 
-                            if ($this->is_login->ganti_pin === '1' && $this->uri->segment(2) != 'ganti-pin') :
+if ($this->is_login->ganti_pin === '1' && $this->uri->segment(2) != 'ganti-pin') :
 
-                                $data = [
-                                    'pesan' => 'Selamat datang pengguna layanan mandiri <b> ' . ucwords($this->setting->sebutan_desa . ' ' . $desa['nama_desa']) . ' </b>, <br>Untuk keamanan akun anda, silahkan ganti <b>PIN</b> anda terlebih dahulu sebelum melanjutkan menggunakan layanan mandiri.',
-                                    'aksi'  => site_url('layanan-mandiri/ganti-pin'),
-                                ];
+    $data = [
+        'pesan' => 'Selamat datang pengguna layanan mandiri <b> ' . ucwords($this->setting->sebutan_desa . ' ' . $desa['nama_desa']) . ' </b>, <br>Untuk keamanan akun anda, silahkan ganti <b>PIN</b> anda terlebih dahulu sebelum melanjutkan menggunakan layanan mandiri.',
+        'aksi'  => site_url('layanan-mandiri/ganti-pin'),
+    ];
 
-                                $this->load->view(MANDIRI . '/notif', $data);
-                            endif;
+    $this->load->view(MANDIRI . '/notif', $data);
+endif;
 
-                            $data = $this->session->flashdata('notif');
+$data = $this->session->flashdata('notif');
 
-                            if ($data['status'] == 1) :
-                                $this->load->view(MANDIRI . '/notif', $data);
-                            endif;
-                            ?>
+if ($data['status'] == 1) :
+    $this->load->view(MANDIRI . '/notif', $data);
+endif;
+?>
 						</div>
 					</div>
 				</section>
@@ -290,7 +292,7 @@ defined('BASEPATH') || exit('No direct script access allowed');
 				<div class="pull-right hidden-xs">
 					<b>Versi</b> <?= AmbilVersi() ?>
 				</div>
-				<strong>Aplikasi <a href="https://github.com/OpenSID/OpenSID" target="_blank"> OpenSID</a>, dikembangkan oleh <a href="https://www.facebook.com/groups/OpenSID/" target="_blank">Komunitas OpenSID</a>.</strong>
+				<strong>Aplikasi <a href="https://github.com/OpenSID/OpenSID" target="_blank"> <?= config_item('nama_aplikasi') ?></a>, dikembangkan oleh <a href="https://www.facebook.com/groups/OpenSID/" target="_blank">Komunitas <?= config_item('nama_aplikasi') ?></a>.</strong>
 			</div>
 		</footer>
 	</div>
@@ -308,6 +310,7 @@ defined('BASEPATH') || exit('No direct script access allowed');
 	<!-- DataTables -->
 	<script src="<?= asset('bootstrap/js/jquery.dataTables.min.js') ?>"></script>
 	<script src="<?= asset('bootstrap/js/dataTables.bootstrap.min.js') ?>"></script>
+	<script src="<?= asset('bootstrap/js/dataTables.rowsgroup.min.js') ?>"></script>
 	<!-- bootstrap color picker -->
 	<script src="<?= asset('bootstrap/js/bootstrap-colorpicker.min.js') ?>"></script>
 	<!-- bootstrap Date time picker -->
@@ -360,7 +363,9 @@ defined('BASEPATH') || exit('No direct script access allowed');
 		});
 	</script>
 
+	<?php if (cek_koneksi_internet()): ?>
 	<!-- Form Wizard - jquery.smartWizard -->
 	<script src="https://cdn.jsdelivr.net/npm/smartwizard@5/dist/js/jquery.smartWizard.min.js"></script>
+	<?php endif ?>
 </body>
 </html>

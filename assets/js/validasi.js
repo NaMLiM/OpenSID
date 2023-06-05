@@ -88,12 +88,13 @@ $(document).ready(function() {
 				remote: "Nomor urut itu sudah digunakan",
 			},
 		},
-    success: function() {
-	    csrf_semua_form();
-    }
+		success: function() {
+			csrf_semua_form();
+		}
 	});
 
 	$("#validasi").validate({
+		ignore: ".ignore",
 		errorElement: "label",
 		errorClass: "error",
 		highlight:function (element){
@@ -105,10 +106,18 @@ $(document).ready(function() {
 		errorPlacement: function (error, element) {
 			if (element.parent('.input-group').length) {
 				error.insertAfter(element.parent());
+				element.parent().focus();
 			} else if (element.hasClass('select2')) {
 				error.insertAfter(element.next('span'));
+				element.next('span').focus();
 			} else {
 				error.insertAfter(element);
+				element.focus();
+			}
+		},
+		invalidHandler: function(e, validator){
+			if(validator.errorList.length) {
+				$('#tabs a[href="#' + $(validator.errorList[0].element).closest(".tab-pane").attr('id') + '"]').tab('show');
 			}
 		}
 	});
@@ -131,6 +140,28 @@ $(document).ready(function() {
 				error.insertAfter(element);
 			}
 		}
+	});
+
+	$('.form-validasi').each(function(index, el){
+		$(el).validate({
+			errorElement: "label",
+			errorClass: "error",
+			highlight:function (element){
+				$(element).closest(".form-group").addClass("has-error");
+			},
+			unhighlight:function (element){
+				$(element).closest(".form-group").removeClass("has-error");
+			},
+			errorPlacement: function (error, element) {
+				if (element.parent('.input-group').length) {
+					error.insertAfter(element.parent());
+				} else if (element.hasClass('select2')) {
+					error.insertAfter(element.next('span'));
+				} else {
+					error.insertAfter(element);
+				}
+			}
+		});
 	});
 
 	jQuery.validator.addMethod("nik", function(value, element) {
@@ -156,6 +187,11 @@ $(document).ready(function() {
 
 	jQuery.validator.addMethod("nama", function(value, element) {
 		valid = /^[a-zA-Z '\.,\-]+$/.test(value);
+		return this.optional(element) || valid;
+	}, "Hanya boleh berisi karakter alpha, spasi, titik, koma, tanda petik dan strip");
+
+	jQuery.validator.addMethod("nama_desa", function(value, element) {
+		valid = /^[a-zA-Z '\.,`\-]+$/.test(value);
 		return this.optional(element) || valid;
 	}, "Hanya boleh berisi karakter alpha, spasi, titik, koma, tanda petik dan strip");
 
@@ -266,7 +302,7 @@ $(document).ready(function() {
 	}, "Hanya boleh berisi 6 angka numerik");
 
 	jQuery.validator.addMethod("ip_address", function(value, element) {
-		valid = /^(\d|[1-9]\d|1\d\d|2([0-4]\d|5[0-5]))\.(\d|[1-9]\d|1\d\d|2([0-4]\d|5[0-5]))\.(\d|[1-9]\d|1\d\d|2([0-4]\d|5[0-5]))\.(\d|[1-9]\d|1\d\d|2([0-4]\d|5[0-5]))$/.test(value);
+		valid = /^([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(\d{1,3}\.){3}\d{1,3}$/.test(value);
 		return this.optional(element) || valid;
 	}, "Isi IP address yang valid");
 

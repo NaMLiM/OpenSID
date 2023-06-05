@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,11 +29,14 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
  */
+
+use App\Enums\SHDKEnum;
+use App\Models\Penduduk;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -268,18 +271,39 @@ class Rtm extends Admin_Controller
     public function ajax_add_anggota($id = 0)
     {
         $this->redirect_hak_akses('u');
-        $data['main'] = $this->rtm_model->list_anggota($id);
-        $kk           = $this->rtm_model->get_kepala_rtm($id);
-        if ($kk) {
-            $data['kepala_kk'] = $kk;
-        } else {
-            $data['kepala_kk'] = null;
-        }
 
         $data['penduduk']    = $this->rtm_model->list_penduduk_lepas();
         $data['form_action'] = site_url("{$this->controller}/add_anggota/{$id}");
 
         $this->load->view('rtm/ajax_add_anggota_rtm_form', $data);
+    }
+
+    public function datables_anggota($id_pend = null)
+    {
+        if ($this->input->is_ajax_request()) {
+            $penduduk = Penduduk::with(['keluarga', 'keluarga.anggota'])
+                ->where('kk_level', '=', 1)
+                ->find($id_pend);
+            $anggota = collect($penduduk->keluarga->anggota)->whereIn('id_rtm', ['0', null]);
+
+            if ($anggota->count() > 1) {
+                $keluarga = $anggota->map(static function ($item, $key) {
+                    return [
+                        'no'       => $key + 1,
+                        'id'       => $item->id,
+                        'nik'      => $item->nik,
+                        'nama'     => $item->nama,
+                        'kk_level' => SHDKEnum::valueOf($item->kk_level),
+                    ];
+                })->values();
+            }
+
+            return json([
+                'data' => $keluarga,
+            ]);
+        }
+
+        show_404();
     }
 
     public function edit_anggota($id_rtm = 0, $id = 0)

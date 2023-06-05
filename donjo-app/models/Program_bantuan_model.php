@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -141,7 +141,7 @@ class Program_bantuan_model extends MY_Model
                 // Data Penduduk; $peserta_id adalah NIK
                 $data                   = $this->get_penduduk($peserta_id);
                 $data['alamat_wilayah'] = $this->wilayah_model->get_alamat_wilayah($data);
-                $data['kartu_nik']      = $data['id_peserta']      = $data['nik']; /// NIK Penduduk digunakan sebagai peserta
+                $data['kartu_nik']      = $data['id_peserta'] = $data['nik']; /// NIK Penduduk digunakan sebagai peserta
                 $data['judul_nik']      = 'NIK Penduduk';
                 $data['judul']          = 'Penduduk';
                 break;
@@ -152,7 +152,7 @@ class Program_bantuan_model extends MY_Model
                 $data = $this->get_penduduk($peserta_id);
                 // Data KK
                 $kk                     = $this->get_kk($data['id_kk']);
-                $data['no_kk']          = $data['id_peserta']          = $kk['no_kk']; // No KK digunakan sebagai peserta
+                $data['no_kk']          = $data['id_peserta'] = $kk['no_kk']; // No KK digunakan sebagai peserta
                 $data['nik_kk']         = $kk['nik_kk'];
                 $data['nama_kk']        = $kk['nama_kk'];
                 $data['alamat_wilayah'] = $this->wilayah_model->get_alamat_wilayah($kk);
@@ -163,7 +163,7 @@ class Program_bantuan_model extends MY_Model
 
             case 3:
                 // Data Penduduk; $peserta_id adalah No RTM (kolom no_kk)
-                $data                    = $this->rtm_model->get_kepala_rtm($peserta_id, $is_no_kk                    = true);
+                $data                    = $this->rtm_model->get_kepala_rtm($peserta_id, $is_no_kk = true);
                 $data['id_peserta']      = $data['no_kk']; // No RTM digunakan sebagai peserta
                 $data['nama_kepala_rtm'] = $data['nama'];
                 $data['kartu_nik']       = $data['nik'];
@@ -610,21 +610,25 @@ class Program_bantuan_model extends MY_Model
     {
         if ($slug === false) {
             //Query untuk expiration status, jika end date sudah melebihi dari datenow maka status otomatis menjadi tidak aktif
-            $expirySQL   = 'UPDATE program SET status = IF(edate < CURRENT_DATE(), 0, IF(edate > CURRENT_DATE(), 1, status)) WHERE status IS NOT NULL';
-            $expiryQuery = $this->db->query($expirySQL);
+            $expirySQL = 'UPDATE program SET status = IF(edate < CURRENT_DATE(), 0, IF(edate > CURRENT_DATE(), 1, status)) WHERE status IS NOT NULL';
+            $this->db->query($expirySQL);
 
             $response['paging'] = $this->paging_bantuan($p);
 
             $this->sasaran_sql();
 
             $data = $this->db
-                ->select('COUNT(v.id) AS jml_peserta, p.id, p.nama, p.sasaran, p.ndesc, p.sdate, p.edate, p.userid, p.status, p.asaldana')
+                ->select('p.id, p.nama, p.sasaran, p.ndesc, p.sdate, p.edate, p.userid, p.status, p.asaldana')
                 ->from('program p')
-                ->join('program_peserta v', 'p.id = v.program_id', 'left')
                 ->group_by('p.id')
                 ->limit($response['paging']->per_page, $response['paging']->offset)
-                ->get()->result_array();
-            $response['program'] = $data;
+                ->get()
+                ->result_array();
+            $response['program'] = collect($data)->map(function ($item, $key) {
+                $item['jml_peserta'] = $this->db->query($this->get_peserta_sql($item['id'], (int) $item['sasaran'], true))->row_array()['jumlah'];
+
+                return $item;
+            });
 
             return $response;
         }
@@ -785,7 +789,6 @@ class Program_bantuan_model extends MY_Model
         $data['asaldana'] = $post['asaldana'];
         $data['sdate']    = date('Y-m-d', strtotime($post['sdate']));
         $data['edate']    = date('Y-m-d', strtotime($post['edate']));
-        $data['status']   = $post['status'];
 
         return $data;
     }
@@ -1289,5 +1292,50 @@ class Program_bantuan_model extends MY_Model
         return $this->db
             ->where_in('id', $peserta_hapus)
             ->delete('program_peserta');
+    }
+
+    public function peserta_duplikat($program)
+    {
+        return $this->db
+            ->select('pp.peserta, COUNT(peserta) as jumlah, MAX(pp.id) as id, MAX(p.nama) as nama, MAX(p.sasaran) as sasaran, MAX(pp.kartu_nama) as kartu_nama')
+            ->from('program_peserta pp')
+            ->join('program p', 'pp.program_id = p.id')
+            ->where('pp.program_id', $program['id'])
+            ->group_by('pp.peserta')
+            ->having('COUNT(peserta) > 1')
+            ->get()->result_array() ?? [];
+    }
+
+    public function peserta_tidak_valid($sasaran)
+    {
+        $query = $this->db->select('pp.id, p.nama, p.sasaran, pp.peserta, pp.kartu_nama')
+            ->from('program_peserta pp')
+            ->join('program p', 'p.id = pp.program_id')
+            ->where('p.sasaran', $sasaran)
+            ->where('s.id is NULL')
+            ->order_by('p.sasaran', 'pp.peserta');
+
+        switch ($sasaran) {
+            case '1':
+                $query->join('tweb_penduduk s', 's.nik = pp.peserta', 'left');
+                break;
+
+            case '2':
+                $query->join('tweb_keluarga s', 's.no_kk = pp.peserta', 'left');
+                break;
+
+            case '3':
+                $query->join('tweb_rtm s', 's.no_kk = pp.peserta', 'left');
+                break;
+
+            case '4':
+                $query->join('kelompok s', 's.kode = pp.peserta', 'left');
+                break;
+
+            default:
+                break;
+        }
+
+        return $query->get()->result_array() ?? [];
     }
 }

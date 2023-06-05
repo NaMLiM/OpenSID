@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,13 +29,18 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
  */
 
 use Carbon\Carbon;
+use App\Models\Config;
+use App\Models\JamKerja;
+use App\Models\GrupAkses;
+use App\Models\Kehadiran;
+use Illuminate\Support\Facades\Schema;
 
 if (! function_exists('asset')) {
     function asset($uri = '', $default = true)
@@ -70,19 +75,23 @@ if (! function_exists('view')) {
         }
 
         $factory->directive('selected', static function ($condition) {
-            return "<?php if({$condition}): echo 'selected'; endif; ?>";
+            return "<?= ({$condition}) ? 'selected' : ''; ?>";
         });
 
         $factory->directive('checked', static function ($condition) {
-            return "<?php if({$condition}): echo 'checked'; endif; ?>";
+            return "<?= ({$condition}) ? 'checked' : ''; ?>";
         });
 
         $factory->directive('disabled', static function ($condition) {
-            return "<?php if({$condition}): echo 'disabled'; endif; ?>";
+            return "<?= ({$condition}) ? 'disabled' : ''; ?>";
         });
 
         $factory->directive('active', static function ($condition) {
-            return "<?php if({$condition}): echo 'active'; endif; ?>";
+            return "<?= ({$condition}) ? 'active' : ''; ?>";
+        });
+
+        $factory->directive('display', static function ($condition) {
+            return "<?= ({$condition}) ? 'show' : 'hide'; ?>";
         });
 
         if ($CI->session->db_error['code'] === 1049) {
@@ -90,25 +99,28 @@ if (! function_exists('view')) {
             $CI->session->unset_userdata(['db_error', 'message', 'heading', 'message_query', 'message_exception', 'sudah_mulai']);
         } else {
             $factory->share([
+                'ci'           => get_instance(),
                 'auth'         => $CI->session->isAdmin,
                 'controller'   => $CI->controller,
-                'desa'         => \App\Models\Config::first(),
+                'desa'         => Config::first(),
                 'list_setting' => $CI->list_setting,
                 'modul'        => $CI->header['modul'],
                 'modul_ini'    => $CI->modul_ini,
                 'notif'        => [
-                    'surat'       => $CI->header['notif_permohonan_surat'],
-                    'opendkpesan' => $CI->header['notif_pesan_opendk'],
-                    'inbox'       => $CI->header['notif_inbox'],
-                    'komentar'    => $CI->header['notif_komentar'],
-                    'langganan'   => $CI->header['notif_langganan'],
-                    'pengumuman'  => $CI->header['notif_pengumuman'],
+                    'surat'           => $CI->header['notif_permohonan_surat'],
+                    'opendkpesan'     => $CI->header['notif_pesan_opendk'],
+                    'inbox'           => $CI->header['notif_inbox'],
+                    'komentar'        => $CI->header['notif_komentar'],
+                    'langganan'       => $CI->header['notif_langganan'],
+                    'pengumuman'      => $CI->header['notif_pengumuman'],
+                    'permohonansurat' => $CI->header['notif_permohonan'],
                 ],
-                'kategori'      => $CI->header['kategori'],
-                'sub_modul_ini' => $CI->sub_modul_ini,
-                'session'       => $CI->session,
-                'setting'       => $CI->setting,
-                'token'         => $CI->security->get_csrf_token_name(),
+                'kategori'             => $CI->header['kategori'],
+                'sub_modul_ini'        => $CI->sub_modul_ini,
+                'session'              => $CI->session,
+                'setting'              => $CI->setting,
+                'token'                => $CI->security->get_csrf_token_name(),
+                'perbaharui_langganan' => $CI->header['perbaharui_langganan'] ?? null,
             ]);
         }
 
@@ -131,13 +143,17 @@ if (! function_exists('session')) {
 }
 
 if (! function_exists('can')) {
-    function can($akses, $controller = '')
+    function can($akses, $controller = '', $admin_only = false)
     {
         $CI = &get_instance();
         $CI->load->model('user_model');
 
         if (empty($controller)) {
             $controller = $CI->controller;
+        }
+
+        if ($admin_only && $CI->grup != GrupAkses::ADMINISTRATOR) {
+            return false;
         }
 
         return $CI->user_model->hak_akses($CI->grup, $controller, $akses);
@@ -196,8 +212,12 @@ if (! function_exists('setting')) {
     {
         $getSetting = get_instance()->setting;
 
-        if ($params && property_exists($getSetting, $params)) {
-            return $getSetting->{$params};
+        if ($params) {
+            if (property_exists($getSetting, $params)) {
+                return $getSetting->{$params};
+            }
+
+            return null;
         }
 
         return $getSetting;
@@ -366,5 +386,139 @@ if (! function_exists('folder_desa')) {
         write_file(DESAPATH . 'offline_mode.php', config_item('offline_mode'), 'x');
 
         return true;
+    }
+}
+
+if (! function_exists('auth')) {
+    /**
+     * Ambil data user login
+     *
+     * @param mixed|null $params
+     */
+    function auth($params = null)
+    {
+        $CI = &get_instance();
+
+        if (null !== $params) {
+            return $CI->session->isAdmin->{$params};
+        }
+
+        return $CI->session->isAdmin;
+    }
+}
+
+if (! function_exists('ci_db')) {
+    function ci_db()
+    {
+        return get_instance()->db;
+    }
+}
+
+if (! function_exists('cek_kehadiran')) {
+    /**
+     * Cek perangkat lupa absen
+     */
+    function cek_kehadiran()
+    {
+        if (Schema::hasTable('kehadiran_jam_kerja')) {
+            $cek_libur = JamKerja::libur()->first();
+            $cek_jam   = JamKerja::jamKerja()->first();
+            $kehadiran = Kehadiran::where('status_kehadiran', 'hadir')->where('jam_keluar', null)->get();
+            if ($kehadiran->count() > 0 && ($cek_jam != null || $cek_libur != null)) {
+                foreach ($kehadiran as $data) {
+                    Kehadiran::lupaAbsen($data->tanggal);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dipanggil untuk setiap kode isian ditemukan,
+ * dan diganti dengan kata pengganti yang huruf besar/kecil mengikuti huruf kode isian.
+ * Berdasarkan contoh di http://stackoverflow.com/questions/19317493/php-preg-replace-case-insensitive-match-with-case-sensitive-replacement
+ *
+ * @param string $dari
+ * @param string $ke
+ * @param string $str
+ *
+ * @return void
+ */
+if (! function_exists('case_replace')) {
+    function case_replace($dari, $ke, $str)
+    {
+        $replacer = static function ($matches) use ($ke) {
+            $matches = array_map(static function ($match) {
+                return preg_replace('/[\\[\\]]/', '', $match);
+            }, $matches);
+
+            // Huruf kecil semua
+            if (ctype_lower($matches[0][0])) {
+                return strtolower($ke);
+            }
+
+            // Huruf besar semua
+            if (ctype_upper($matches[0][0]) && ctype_upper($matches[0][1])) {
+                return strtoupper($ke);
+            }
+
+            // Huruf besar diawal kata
+            if (ctype_upper($matches[0][0]) && ctype_upper($matches[0][2])) {
+                return ucwords(strtolower($ke));
+            }
+
+            // Normal
+            if (ctype_upper($matches[0][0]) && ctype_upper($matches[0][strlen($matches) - 1])) {
+                return $ke;
+            }
+
+            // Huruf besar diawal kalimat
+            if (ctype_upper($matches[0][0])) {
+                return ucfirst(strtolower($ke));
+            }
+        };
+
+        $dari = str_replace('[', '\\[', $dari);
+
+        $result = preg_replace_callback('/(' . $dari . ')/i', $replacer, $str);
+
+        if (preg_match('/pendidikan/i', strtolower($dari))) {
+            $result = kasus_lain('pendidikan', $result);
+        } elseif (preg_match('/pekerjaan/i', strtolower($dari))) {
+            $result = kasus_lain('pekerjaan', $result);
+        }
+
+        return $result;
+    }
+}
+
+if (! function_exists('kirim_versi_opensid')) {
+    function kirim_versi_opensid()
+    {
+        $ci = get_instance();
+        if (empty($ci->header['desa']['kode_desa'])) {
+            return;
+        }
+
+        $ci->load->driver('cache');
+
+        $versi = AmbilVersi();
+
+        if ($versi != $ci->cache->file->get('versi_app_cache')) {
+            try {
+                $client = new \GuzzleHttp\Client();
+                $client->post(config_item('server_layanan') . '/api/v1/pelanggan/catat-versi', [
+                    'headers'     => ['X-Requested-With' => 'XMLHttpRequest'],
+                    'form_params' => [
+                        'kode_desa' => kode_wilayah($ci->header['desa']['kode_desa']),
+                        'versi'     => $versi,
+                    ],
+                ])
+                    ->getBody();
+                $ci->cache->file->save('versi_app_cache', $versi);
+            } catch (Exception $e) {
+                log_message('error', $e);
+            }
+        }
     }
 }

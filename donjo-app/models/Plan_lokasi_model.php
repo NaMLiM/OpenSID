@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -126,13 +126,17 @@ class Plan_lokasi_model extends MY_Model
     public function list_data($o = 0, $offset = 0, $limit = 1000)
     {
         switch ($o) {
-            case 1: $order_sql = ' ORDER BY nama'; break;
+            case 1: $order_sql = ' ORDER BY nama';
+                break;
 
-            case 2: $order_sql = ' ORDER BY nama DESC'; break;
+            case 2: $order_sql = ' ORDER BY nama DESC';
+                break;
 
-            case 3: $order_sql = ' ORDER BY enabled'; break;
+            case 3: $order_sql = ' ORDER BY enabled';
+                break;
 
-            case 4: $order_sql = ' ORDER BY enabled DESC'; break;
+            case 4: $order_sql = ' ORDER BY enabled DESC';
+                break;
 
             default:$order_sql = ' ORDER BY id';
         }
@@ -178,11 +182,12 @@ class Plan_lokasi_model extends MY_Model
         $nama_file   = $_FILES['foto']['name'];
         $nama_file   = str_replace(' ', '-', $nama_file); 	 // normalkan nama file
         if (! empty($lokasi_file)) {
-            if ($tipe_file == 'image/jpg' || $tipe_file == 'image/jpeg') {
-                UploadLokasi($nama_file);
-                $data['foto'] = $nama_file;
-                $outp         = $this->db->insert('lokasi', $data);
+            $upload = UploadPeta($nama_file, LOKASI_FOTO_LOKASI);
+            if (! $upload) {
+                return;
             }
+            $data['foto'] = $nama_file;
+            $outp         = $this->db->insert('lokasi', $data);
         } else {
             unset($data['foto']);
             $outp = $this->db->insert('lokasi', $data);
@@ -204,7 +209,10 @@ class Plan_lokasi_model extends MY_Model
         $nama_file   = str_replace(' ', '-', $nama_file); 	 // normalkan nama file
         if (! empty($lokasi_file)) {
             if ($tipe_file == 'image/jpg' || $tipe_file == 'image/jpeg') {
-                UploadLokasi($nama_file);
+                $upload = UploadPeta($nama_file, LOKASI_FOTO_LOKASI);
+                if (! $upload) {
+                    return;
+                }
                 $data['foto'] = $nama_file;
                 $this->db->where('id', $id);
                 $outp = $this->db->update('lokasi', $data);
@@ -296,16 +304,22 @@ class Plan_lokasi_model extends MY_Model
         status_sukses($outp); //Tampilkan Pesan
     }
 
-    public function list_lokasi()
+    public function list_lokasi($status = null)
     {
+        if (null !== $status) {
+            $this->db
+                ->where('l.enabled', $status)
+                ->where('p.enabled', $status)
+                ->where('m.enabled', $status);
+        }
+
         return $this->db
             ->select('l.*, p.nama AS kategori, m.nama AS jenis, p.simbol AS simbol')
             ->from('lokasi l')
             ->join('point p', 'l.ref_point = p.id', 'left')
             ->join('point m', 'p.parrent = m.id', 'left')
-            ->where('l.enabled = 1')
-            ->where('p.enabled = 1')
-            ->where('m.enabled = 1')
-            ->get()->result_array();
+            ->where('l.ref_point !=', 0)
+            ->get()
+            ->result_array();
     }
 }

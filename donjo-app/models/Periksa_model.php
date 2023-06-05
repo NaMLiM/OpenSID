@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,11 +29,19 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
  */
+
+use App\Enums\StatusEnum;
+use App\Models\LogPenduduk;
+use App\Models\LogPerubahanPenduduk;
+use App\Models\PendudukMandiri;
+use App\Models\RefJabatan;
+use App\Models\SettingAplikasi;
+use App\Models\User;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -47,18 +55,17 @@ class Periksa_model extends MY_Model
         $this->periksa['migrasi_utk_diulang'] = $this->deteksi_masalah();
     }
 
+    public function getSetting($key)
+    {
+        return SettingAplikasi::where('key', $key)->pluck('value')->first();
+    }
+
     private function deteksi_masalah()
     {
         $db_error_code    = $this->session->db_error['code'];
         $db_error_message = $this->session->db_error['message'];
-
-        $current_version = $this->db
-            ->select('value')
-            ->where('key', 'current_version')
-            ->get('setting_aplikasi')
-            ->row()->value;
-
-        $calon = $current_version;
+        $current_version  = $this->getSetting('current_version');
+        $calon            = $current_version;
 
         // Table tweb_penduduk no_kk ganda
         if (! empty($kk_ganda = $this->deteksi_tweb_keluarga_no_kk_ganda())) {
@@ -105,6 +112,13 @@ class Periksa_model extends MY_Model
                 $this->periksa['masalah'][] = 'kartu_alamat';
             }
             $calon = version_compare($calon, $calon_ini, '<') ? $calon : $calon_ini;
+        }
+
+        $id_pengunjung = ($db_error_code == 1054 && strpos($db_error_message, 'id_pengunjung') !== false);
+        $tipe          = ($db_error_code == 1054 && strpos($db_error_message, 'tipe') !== false);
+
+        if ($id_pengunjung || $tipe) {
+            $this->perbaiki_anjungan();
         }
 
         // id_cluster Keluarga beserta anggota keluarganya ada yg null
@@ -194,6 +208,25 @@ class Periksa_model extends MY_Model
         if (! empty($collation_table) || $error_msg) {
             $this->periksa['masalah'][]       = 'collation';
             $this->periksa['collation_table'] = $collation_table;
+        }
+
+        // Error invalid date
+        if (! empty($tabel_invalid_date = $this->deteksi_invalid_date())) {
+            $this->periksa['masalah'][]          = 'tabel_invalid_date';
+            $this->periksa['tabel_invalid_date'] = $tabel_invalid_date;
+        }
+
+        // Error table doesn't exist
+        if ($db_error_code === 1146) {
+            $calon_ini                  = $this->deteksi_table_doesnt_exist($db_error_message);
+            $this->periksa['masalah'][] = 'table_not_exist';
+            $calon                      = version_compare($calon, $calon_ini, '<') ? $calon : $calon_ini;
+        }
+
+        // Deteksi jabatan kades atau sekdes tidak ada
+        if (! empty($jabatan = $this->deteksi_jabatan())) {
+            $this->periksa['masalah'][]    = 'data_jabatan_tidak_ada';
+            $this->periksa['data_jabatan'] = $jabatan;
         }
 
         return $calon;
@@ -350,6 +383,86 @@ class Periksa_model extends MY_Model
             ->result_array();
     }
 
+    private function deteksi_invalid_date()
+    {
+        $tabel = [];
+
+        // Tabel log_penduduk
+        $logPenduduk = LogPenduduk::select(['id', 'tgl_lapor', 'tgl_peristiwa', 'created_at', 'updated_at'])
+            ->whereDate('created_at', '0000-00-00')
+            ->orWhereDate('tgl_lapor', '0000-00-00')
+            ->orWhereDate('tgl_peristiwa', '0000-00-00')
+            ->get();
+
+        if ($logPenduduk->count() > 0) {
+            $tabel['log_penduduk'] = $logPenduduk;
+        }
+
+        // Tabel log_perubahan_penduduk
+        $logPerubahanPenduduk = LogPerubahanPenduduk::select(['id', 'id_pend', 'tanggal'])
+            ->whereDate('tanggal', '0000-00-00')
+            ->get();
+
+        if ($logPerubahanPenduduk->count() > 0) {
+            $tabel['log_perubahan_penduduk'] = $logPerubahanPenduduk;
+        }
+
+        // Tabel penduduk_mandiri
+        $pendudukMandiri = PendudukMandiri::select(['id_pend', 'tanggal_buat', 'updated_at'])
+            ->whereDate('updated_at', '0000-00-00')
+            ->get();
+
+        if ($pendudukMandiri->count() > 0) {
+            $tabel['tweb_penduduk_mandiri'] = $pendudukMandiri;
+        }
+
+        return $tabel;
+    }
+
+    private function deteksi_jabatan()
+    {
+        $jabatan = [];
+        $user    = auth()->id ?? User::first()->id;
+
+        // Cek jabatan kades
+        if (! RefJabatan::find(RefJabatan::KADES)) {
+            $jabatan[] = [
+                'id'         => 1,
+                'nama'       => 'Kepala ' . ucwords($this->getSetting('sebutan_desa')),
+                'jenis'      => StatusEnum::YA,
+                'created_by' => $user,
+                'updated_by' => $user,
+            ];
+        }
+
+        // Cek jabatan sekdes
+        if (! RefJabatan::find(RefJabatan::SEKDES)) {
+            $jabatan[] = [
+                'id'         => 2,
+                'nama'       => 'Sekretaris',
+                'jenis'      => StatusEnum::YA,
+                'created_by' => $user,
+                'updated_by' => $user,
+            ];
+        }
+
+        return $jabatan;
+    }
+
+    private function deteksi_table_doesnt_exist($table = null)
+    {
+        $database = $this->db->database;
+        $table    = str_replace(["Table '", $database, '.', "' doesn't exist"], '', $table);
+
+        switch ($table) {
+            case 'ref_penduduk_hamil':
+                return '22.02';
+
+            default:
+                return null;
+        }
+    }
+
     public function perbaiki()
     {
         // TODO: login
@@ -410,6 +523,14 @@ class Periksa_model extends MY_Model
 
                 case 'collation':
                     $this->perbaiki_collation_table();
+                    break;
+
+                case 'tabel_invalid_date':
+                    $this->perbaiki_invalid_date();
+                    break;
+
+                case 'data_jabatan_tidak_ada':
+                    $this->perbaiki_jabatan();
                     break;
 
                 default:
@@ -818,5 +939,109 @@ class Periksa_model extends MY_Model
         }
 
         return $hasil;
+    }
+
+    private function perbaiki_invalid_date()
+    {
+        $hasil = true;
+
+        // Tabel log_penduduk
+        if ($logPenduduk = $this->periksa['tabel_invalid_date']['log_penduduk']) {
+            log_message('error', 'ada log_penduduk');
+
+            foreach ($logPenduduk as $log) {
+                $update = LogPenduduk::find($log->id);
+
+                // created_at, ambil data dari updated_at
+                if ($log->created_at->format('Y-m-d H:i:s') == '-0001-11-30 00:00:00') {
+                    $hasil = $hasil && $update->update(['created_at' => $log->updated_at->format('Y-m-d H:i:s')]);
+                }
+
+                // tgl_lapor, ambil data dari created_at
+                if ($log->tgl_lapor->format('Y-m-d H:i:s') == '-0001-11-30 00:00:00') {
+                    $hasil = $hasil && $update->update(['tgl_lapor' => $log->created_at->format('Y-m-d H:i:s')]);
+                }
+
+                // tgl_peristiwa, ambil data dari default 1971-01-01 00:00:00 (agar tidak merusak laporan yg sudah ada)
+                if ($log->tgl_peristiwa->format('Y-m-d H:i:s') == '-0001-11-30 00:00:00') {
+                    $hasil = $hasil && $update->update(['tgl_peristiwa' => '1971-01-01 00:00:00']);
+                }
+            }
+
+            log_message('error', 'Sesuaikan tanggal invalid pada kolom tgl_lapor, tgl_peristiwa dan created_at tabel log_pendudk pada data berikut ini : ' . print_r($logPenduduk->toArray(), true));
+        }
+
+        // Tabel log_perubahan_penduduk, field tanggal => isi data dari tweb_penduduk->updated_at
+        if ($logPerubahanPenduduk = $this->periksa['tabel_invalid_date']['log_perubahan_penduduk']) {
+            foreach ($logPerubahanPenduduk as $log) {
+                if (null === $log->penduduk) {
+                    // Hapus data log yang tidak digunakan
+                    $hasil = $hasil && LogPerubahanPenduduk::find($log->id)->delete();
+                } else {
+                    $hasil = $hasil && LogPerubahanPenduduk::where('id', $log->id)->update(['tanggal' => $log->penduduk->updated_at->format('Y-m-d H:i:s')]);
+                }
+            }
+
+            log_message('error', 'Sesuaikan tanggal invalid pada kolom tanggal tabel log_perubahan_penduduk pada data berikut ini : ' . print_r($logPerubahanPenduduk->toArray(), true));
+        }
+
+        // Tabel tweb_penduduk_mandiri, field updated_at => isi data dari tweb_penduduk_mandiri->taanggal_buat
+        if ($pendudukMandiri = $this->periksa['tabel_invalid_date']['tweb_penduduk_mandiri']) {
+            foreach ($pendudukMandiri as $mandiri) {
+                $hasil = $hasil && PendudukMandiri::where('id_pend', $mandiri->id_pend)->update(['updated_at' => $mandiri->tanggal_buat]);
+            }
+
+            log_message('error', 'Sesuaikan tanggal invalid pada kolom tanggal tabel mandiri_perubahan_penduduk pada data berikut ini : ' . print_r($pendudukMandiri->toArray(), true));
+        }
+
+        return $hasil;
+    }
+
+    private function perbaiki_jabatan()
+    {
+        if ($jabatan = $this->periksa['data_jabatan']) {
+            RefJabatan::insert($jabatan);
+        }
+
+        return true;
+    }
+
+    private function perbaiki_anjungan()
+    {
+        if (! $this->db->field_exists('id_pengunjung', 'anjungan')) {
+            $fields_id_pengunjung = [
+                'id_pengunjung' => [
+                    'type'       => 'VARCHAR',
+                    'constraint' => 100,
+                    'null'       => true,
+                    'default'    => null,
+                ],
+            ];
+            $this->dbforge->add_column('anjungan', $fields_id_pengunjung);
+        }
+
+        if (! $this->db->field_exists('tipe', 'anjungan')) {
+            $fields_tipe = [
+                'tipe' => [
+                    'type'       => 'TINYINT',
+                    'default'    => 1, // 1 => anjungan, 2 => gawai layanan
+                    'constraint' => 3,
+                ],
+            ];
+            $this->dbforge->add_column('anjungan', $fields_tipe);
+        }
+
+        if (! $this->db->field_exists('tipe', 'teks_berjalan')) {
+            $fields = [
+                'tipe' => [
+                    'type'       => 'TINYINT',
+                    'constraint' => 2,
+                    'null'       => true,
+                    'default'    => 1,
+                    'after'      => 'status',
+                ],
+            ];
+            $this->dbforge->add_column('teks_berjalan', $fields);
+        }
     }
 }

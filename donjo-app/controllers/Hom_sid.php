@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -44,31 +44,44 @@ use App\Models\Penduduk;
 use App\Models\PendudukMandiri;
 use App\Models\Rtm;
 use App\Models\Wilayah;
+use Illuminate\Support\Facades\Schema;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
 class Hom_sid extends Admin_Controller
 {
-    private $viewPath = 'admin.home';
+    public $isAdmin;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->isAdmin = $this->session->isAdmin->pamong;
+    }
 
     public function index()
     {
         get_pesan_opendk(); //ambil pesan baru di opendk
+
         $this->modul_ini = 1;
 
+        $this->load->library('saas');
+
         $data = [
-            'rilis'       => $this->getUpdate(),
-            'bantuan'     => $this->bantuan(),
-            'penduduk'    => Penduduk::status()->count(),
-            'keluarga'    => Keluarga::status()->count(),
-            'rtm'         => Rtm::status()->count(),
-            'kelompok'    => Kelompok::status()->tipe()->count(),
-            'dusun'       => Wilayah::dusun()->count(),
-            'pendaftaran' => PendudukMandiri::status()->count(),
-            'surat'       => LogSurat::count(),
+            'rilis'           => $this->getUpdate(),
+            'bantuan'         => $this->bantuan(),
+            'penduduk'        => Penduduk::status()->count(),
+            'keluarga'        => Keluarga::status()->count(),
+            'rtm'             => Rtm::status()->count(),
+            'kelompok'        => Schema::hasColumn('kelompok', 'tipe') ? Kelompok::status()->tipe()->count() : 0,
+            'dusun'           => Wilayah::dusun()->count(),
+            'pendaftaran'     => Schema::hasColumn('tweb_penduduk_mandiri', 'aktif') ? PendudukMandiri::status()->count() : 0,
+            'surat'           => (! $this->db->field_exists('deleted_at', 'log_surat')) ? 0 : $this->logSurat(), // jika kolom deleted_at tidak ada, kosongkan jumlah surat.
+            'saas'            => $this->saas->peringatan(),
+            'notif_langganan' => $this->notif_model->status_langganan(),
         ];
 
-        return view("{$this->viewPath}.index", $data);
+        return view('admin.home.index', $data);
     }
 
     private function getUpdate()
@@ -80,7 +93,7 @@ class Hom_sid extends Admin_Controller
             $release->setApiUrl($url_rilis)->setCurrentVersion(null);
 
             $info['update_available'] = $release->isAvailable();
-            $info['current_version']  = 'v' . VERSION;
+            $info['current_version']  = 'v' . AmbilVersi();
             $info['latest_version']   = $release->getLatestVersion();
             $info['release_name']     = $release->getReleaseName();
             $info['release_body']     = $release->getReleaseBody();
@@ -99,5 +112,27 @@ class Hom_sid extends Admin_Controller
         $bantuan['program']     = Bantuan::status()->pluck('nama', 'id');
 
         return $bantuan;
+    }
+
+    protected function logSurat()
+    {
+        return LogSurat::whereNull('deleted_at')
+            ->when($this->isAdmin->jabatan_id == '1', static function ($q) {
+                return $q->when(setting('tte') == 1, static function ($tte) {
+                    return $tte->where('tte', '=', 1);
+                })
+                    ->when(setting('tte') == 0, static function ($tte) {
+                        return $tte->where('verifikasi_kades', '=', '1');
+                    })
+                    ->orWhere(static function ($verifikasi) {
+                        $verifikasi->whereNull('verifikasi_operator');
+                    });
+            })
+            ->when($this->isAdmin->jabatan_id == '2', static function ($q) {
+                return $q->where('verifikasi_sekdes', '=', '1')->orWhereNull('verifikasi_operator');
+            })
+            ->when($this->isAdmin == null || ! in_array($this->isAdmin->jabatan_id, ['1', '2']), static function ($q) {
+                return $q->where('verifikasi_operator', '=', '1')->orWhereNull('verifikasi_operator');
+            })->count();
     }
 }

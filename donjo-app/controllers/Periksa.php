@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -83,24 +83,19 @@ class Periksa extends CI_Controller
     // Login khusus untuk periksa
     public function login()
     {
+        if ($this->session->periksa_data == 1) {
+            redirect('periksa');
+        }
+
         $this->session->siteman_wait = 0;
-        $this->user_model->login();
-        $data = [
+        $data                        = [
             'header'      => $this->header,
             'form_action' => site_url('periksa/auth'),
         ];
-        $this->setting->sebutan_desa      = $this->getSetting('sebutan_desa');
-        $this->setting->sebutan_kabupaten = $this->getSetting('sebutan_kabupaten');
-        $this->load->view('siteman', $data);
-    }
 
-    private function getSetting($key)
-    {
-        return $this->db
-            ->select('value')
-            ->where('key', $key)
-            ->get('setting_aplikasi')
-            ->row()->value;
+        $this->setting->sebutan_desa      = $this->periksa_model->getSetting('sebutan_desa');
+        $this->setting->sebutan_kabupaten = $this->periksa_model->getSetting('sebutan_kabupaten');
+        $this->load->view('siteman', $data);
     }
 
     // Login khusus untuk periksa

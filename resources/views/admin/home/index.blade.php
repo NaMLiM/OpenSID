@@ -17,17 +17,21 @@
 
 @section('title')
 <h1>
-  Tentang OpenSID
+  Tentang <?= config_item('nama_aplikasi') ?>
 </h1>
 @endsection
 
 @section('breadcrumb')
-<li class="active">Tentang OpenSID</li>
+<li class="active">Tentang <?= config_item('nama_aplikasi') ?></li>
 @endsection
 
 @section('content')
 
 @include('admin.layouts.components.notifikasi')
+
+@include('admin.home.saas')
+
+@include('admin.home.premium')
 
 @include('admin.home.rilis')
 

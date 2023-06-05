@@ -1,9 +1,9 @@
 <?php defined('BASEPATH') || exit('No direct script access allowed'); ?>
 <?php
-    $CI = &get_instance();
-    if (! isset($CI)) {
-        $CI = new CI_Controller();
-    }
+$CI = &get_instance();
+if (! isset($CI)) {
+    $CI = new CI_Controller();
+}
 ?>
 
 <!DOCTYPE html>
@@ -25,7 +25,7 @@
 			<p>
 				<?= $message; ?>
 
-				Versi OpenSID <?= AmbilVersi()?>. PHP versi <?= preg_split('/-/', PHP_VERSION)[0]?>.
+				Versi <?= config_item('nama_aplikasi') . ' ' . AmbilVersi() ?>. PHP versi <?= preg_split('/-/', PHP_VERSION)[0]?>.
 
 				<?php if ($status_code >= 500): ?>
 					<br><br>

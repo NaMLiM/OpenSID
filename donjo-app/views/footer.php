@@ -2,7 +2,7 @@
 					<div class="pull-right hidden-xs">
 						<b>Versi</b> <?= AmbilVersi() ?>
 					</div>
-					<strong>Aplikasi <a href="https://github.com/OpenSID/OpenSID" target="_blank"> OpenSID</a>, dikembangkan oleh <a href="https://www.facebook.com/groups/OpenSID/" target="_blank">Komunitas OpenSID</a>.</strong>
+					<strong>Aplikasi <a href="https://github.com/OpenSID/OpenSID" target="_blank"><?= config_item('nama_aplikasi') ?></a>, dikembangkan oleh <a href="https://www.facebook.com/groups/OpenSID/" target="_blank">Komunitas <?= config_item('nama_aplikasi') ?></a>.</strong>
 				</footer>
 				<?php include RESOURCESPATH . 'views/admin/layouts/partials/control_sidebar.blade.php'; ?>
 				</div>
@@ -50,6 +50,29 @@
 				<script src="<?= asset('js/custom-select2.js') ?>"></script>
 				<script src="<?= asset('js/custom-datetimepicker.js') ?>"></script>
 
+				<!-- numeral js -->
+				<script src="<?= asset('js/numeraljs/numeral.min.js') ?>"></script>
+				<script type="text/javascript">
+					numeral.register("locale", "id-id", {
+						delimiters: {
+							thousands: ".",
+							decimal: ","
+						},
+						abbreviations: {
+								thousand: 'k',
+								million: 'm',
+								billion: 'b',
+								trillion: 't'
+							},
+						currency: {
+							symbol: "Rp." //The currency for UAE is called the Dirham
+						}
+					});
+					numeral.locale('id-id');
+					numeral.defaultFormat('0,0.00');
+					console.log(numeral.locale())
+				</script>
+
 				<!-- Token Field -->
 				<?php if ($this->controller == 'bumindes_kader') : ?>
 					<script src="<?= asset('bootstrap/js/bootstrap-tokenfield.min.js') ?>"></script>
@@ -71,6 +94,12 @@
 				<!-- NOTIFICATION-->
 				<script type="text/javascript">
 					$('document').ready(function() {
+						var koneksi = '<?= ! cek_koneksi_internet() && setting('notifikasi_koneksi') ?>';
+
+						if (koneksi) {
+							cek_koneksi();
+						}
+
 						var success = '<?= addslashes($this->session->success) ?>';
 						var message = '<?= addslashes($this->session->error_msg) ?>';
 
@@ -115,6 +144,7 @@
 					});
 				</script>
 				<?php session_error_clear(); ?>
+
 				</body>
 
 				</html>

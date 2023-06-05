@@ -11,7 +11,7 @@
  * Aplikasi dan source code ini dirilis berdasarkan lisensi GPL V3
  *
  * Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  *
  * Dengan ini diberikan izin, secara gratis, kepada siapa pun yang mendapatkan salinan
  * dari perangkat lunak ini dan file dokumentasi terkait ("Aplikasi Ini"), untuk diperlakukan
@@ -29,7 +29,7 @@
  * @package   OpenSID
  * @author    Tim Pengembang OpenDesa
  * @copyright Hak Cipta 2009 - 2015 Combine Resource Institution (http://lumbungkomunitas.net/)
- * @copyright Hak Cipta 2016 - 2022 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
+ * @copyright Hak Cipta 2016 - 2023 Perkumpulan Desa Digital Terbuka (https://opendesa.id)
  * @license   http://www.gnu.org/licenses/gpl.html GPL V3
  * @link      https://github.com/OpenSID/OpenSID
  *
@@ -37,9 +37,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+defined('BASEPATH') || exit('No direct script access allowed');
 
-class Keluarga extends Model
+class Keluarga extends BaseModel
 {
     /**
      * The table associated with the model.
@@ -63,6 +63,13 @@ class Keluarga extends Model
     protected $guarded = [];
 
     /**
+     * {@inheritDoc}
+     */
+    protected $with = [
+        'wilayah',
+    ];
+
+    /**
      * Define a one-to-one relationship.
      *
      * @return \Illuminate\Database\Eloquent\Relations\hasOne
@@ -79,7 +86,17 @@ class Keluarga extends Model
      */
     public function anggota()
     {
-        return $this->hasMany(Penduduk::class, 'id_kk');
+        return $this->hasMany(Penduduk::class, 'id_kk')->orderBy('kk_level');
+    }
+
+    /**
+     * Define an inverse one-to-one or many relationship.
+     *
+     * @return BelongsTo
+     */
+    public function Wilayah()
+    {
+        return $this->belongsTo(Wilayah::class, 'id_cluster');
     }
 
     /**
