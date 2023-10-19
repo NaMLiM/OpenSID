@@ -54,8 +54,8 @@ class Area extends Admin_Controller
         parent::__construct();
 
         $this->load->model(['wilayah_model', 'plan_lokasi_model', 'plan_area_model', 'plan_garis_model', 'pembangunan_model', 'pembangunan_dokumentasi_model']);
-        $this->modul_ini     = 9;
-        $this->sub_modul_ini = 8;
+        $this->modul_ini     = 'pemetaan';
+        $this->sub_modul_ini = 'pengaturan-peta';
         $this->list_session;
         $this->set_page;
     }
@@ -110,6 +110,7 @@ class Area extends Admin_Controller
 
         $data['list_polygon'] = $this->plan_area_model->list_polygon();
         $data['tip']          = 4;
+        $data['foto_area']    = to_base64(LOKASI_FOTO_AREA . 'kecil_' . $data['area']['foto']);
 
         $this->render('area/form', $data);
     }

@@ -51,8 +51,8 @@ class Plan extends Admin_Controller
         $this->load->model('plan_garis_model');
         $this->load->model('pembangunan_model');
         $this->load->model('pembangunan_dokumentasi_model');
-        $this->modul_ini     = 9;
-        $this->sub_modul_ini = 8;
+        $this->modul_ini     = 'pemetaan';
+        $this->sub_modul_ini = 'pengaturan-peta';
     }
 
     public function clear()
@@ -235,13 +235,13 @@ class Plan extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
         $this->plan_lokasi_model->lokasi_lock($id, 1);
-        redirect("plan/index/{$p}/{$o}");
+        redirect('plan');
     }
 
     public function lokasi_unlock($id = '')
     {
         $this->redirect_hak_akses('u');
         $this->plan_lokasi_model->lokasi_lock($id, 2);
-        redirect("plan/index/{$p}/{$o}");
+        redirect('plan');
     }
 }

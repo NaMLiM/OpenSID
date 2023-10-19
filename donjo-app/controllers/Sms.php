@@ -49,8 +49,8 @@ class Sms extends Admin_Controller
     {
         parent::__construct();
         $this->load->model('sms_model');
-        $this->modul_ini          = 10;
-        $this->sub_modul_ini      = 39;
+        $this->modul_ini          = 'hubung-warga';
+        $this->sub_modul_ini      = 'kirim-pesan';
         $this->header['kategori'] = 'hubung warga';
     }
 
@@ -277,7 +277,7 @@ class Sms extends Admin_Controller
         $notif = $this->kirimPesanGrup($validasi);
 
         if ($notif['jumlahBerhasil'] > 0) {
-            HubungWarga::insert($validasi);
+            HubungWarga::create($validasi);
             set_session('success', "Berhasil Kirim Pesan </br>{$notif['pesanError']}");
         } else {
             set_session('error', "Gagal Kirim Pesan </br>{$notif['pesanError']}");

@@ -49,8 +49,8 @@ class Identitas_desa extends Admin_Controller
     public function __construct()
     {
         parent::__construct();
-        $this->modul_ini     = 200;
-        $this->sub_modul_ini = 17;
+        $this->modul_ini     = 'info-desa';
+        $this->sub_modul_ini = 'identitas-desa';
 
         if (Schema::hasTable('ref_jabatan')) {
             $this->cek_kades = Pamong::kepalaDesa()->exists();
@@ -111,7 +111,7 @@ class Identitas_desa extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        if (Config::insert($this->validate($this->request))) {
+        if (Config::create($this->validate($this->request))) {
             return json([
                 'status' => true,
             ]);
@@ -240,7 +240,7 @@ class Identitas_desa extends Admin_Controller
             'email_desa'        => email($request['email_desa']),
             'telepon'           => bilangan($request['telepon']),
             'website'           => alamat_web($request['website']),
-            'nama_kecamatan'    => nama_terbatas($request['nama_kecamatan']),
+            'nama_kecamatan'    => nama_desa($request['nama_kecamatan']),
             'kode_kecamatan'    => bilangan($request['kode_kecamatan']),
             'nama_kepala_camat' => nama($request['nama_kepala_camat']),
             'nip_kepala_camat'  => nomor_surat_keputusan($request['nip_kepala_camat']),
@@ -248,6 +248,7 @@ class Identitas_desa extends Admin_Controller
             'kode_kabupaten'    => bilangan($request['kode_kabupaten']),
             'nama_propinsi'     => nama_terbatas($request['nama_propinsi']),
             'kode_propinsi'     => bilangan($request['kode_propinsi']),
+            'nomor_operator'    => bilangan($request['nomor_operator']),
         ];
     }
 
@@ -255,8 +256,8 @@ class Identitas_desa extends Admin_Controller
     protected static function unggah($jenis = '', $resize = false, $ukuran = false)
     {
         $CI = &get_instance();
-        $CI->load->library('upload');
-        $CI->uploadConfig = [
+        $CI->load->library('MY_Upload', null, 'upload');
+        $config = [
             'upload_path'   => LOKASI_LOGO_DESA,
             'allowed_types' => 'gif|jpg|jpeg|png',
             'max_size'      => max_upload() * 1024,
@@ -272,7 +273,7 @@ class Identitas_desa extends Admin_Controller
 
         $uploadData = null;
         // Inisialisasi library 'upload'
-        $CI->upload->initialize($CI->uploadConfig);
+        $CI->upload->initialize($config);
         // Upload sukses
         if ($CI->upload->do_upload($jenis)) {
             $uploadData = $CI->upload->data();

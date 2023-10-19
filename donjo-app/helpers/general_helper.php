@@ -35,11 +35,11 @@
  *
  */
 
-use Carbon\Carbon;
 use App\Models\Config;
-use App\Models\JamKerja;
 use App\Models\GrupAkses;
+use App\Models\JamKerja;
 use App\Models\Kehadiran;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 if (! function_exists('asset')) {
@@ -212,7 +212,7 @@ if (! function_exists('setting')) {
     {
         $getSetting = get_instance()->setting;
 
-        if ($params) {
+        if ($params && ! empty($getSetting)) {
             if (property_exists($getSetting, $params)) {
                 return $getSetting->{$params};
             }
@@ -221,6 +221,18 @@ if (! function_exists('setting')) {
         }
 
         return $getSetting;
+    }
+}
+
+// hapus_cache('cache_id');
+if (! function_exists('hapus_cache')) {
+    function hapus_cache($params = null)
+    {
+        if ($params) {
+            return get_instance()->cache->hapus_cache_untuk_semua($params);
+        }
+
+        return false;
     }
 }
 

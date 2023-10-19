@@ -44,7 +44,7 @@ class Kontak extends Admin_Controller
     public function __construct()
     {
         parent::__construct();
-        $this->modul_ini          = 10;
+        $this->modul_ini          = 'hubung-warga';
         $this->sub_modul_ini      = 40;
         $this->header['kategori'] = 'hubung warga';
     }
@@ -105,7 +105,7 @@ class Kontak extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        if (DaftarKontak::insert(static::validate($this->request))) {
+        if (DaftarKontak::create(static::validate($this->request))) {
             redirect_with('success', 'Berhasil Tambah Data');
         }
         redirect_with('error', 'Gagal Tambah Data');

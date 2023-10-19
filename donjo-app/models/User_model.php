@@ -35,6 +35,7 @@
  *
  */
 
+use App\Models\LoginAttempts;
 use App\Models\User;
 use Carbon\Carbon;
 
@@ -74,12 +75,21 @@ class User_model extends CI_Model
     {
         $this->_username = $username = trim($this->input->post('username'));
         $this->_password = $password = trim($this->input->post('password'));
+        $ip_address      = $this->input->ip_address();
 
         if (config_item('demo_mode') && ($username == config_item('demo_user')['username'] && $password == config_item('demo_user')['password'])) {
             // Ambil data user pertama yang merupakan admin
             $user = User::first();
 
             return $this->setLogin($user);
+        }
+
+        if ($this->is_max_login_attempts_exceeded($this->_username, $ip_address)) {
+            $this->session->siteman = -1;
+
+            $this->session->set_flashdata('time_block', $this->get_last_attempt_time($this->_username, $ip_address));
+
+            return false;
         }
 
         $user = User::where('username', $username)->status()->first();
@@ -97,36 +107,35 @@ class User_model extends CI_Model
         // Login gagal: user tidak ada atau tidak lolos verifikasi
         if ($user === false || $authLolos === false) {
             $this->session->siteman = -1;
-            if ($this->session->siteman_try > 2) {
-                $this->session->siteman_try = $this->session->siteman_try - 1;
-            } else {
-                $this->session->siteman_wait = 1;
-                $this->session->unset_userdata('siteman_timeout');
-                siteman_timer();
-            }
+            $this->increase_login_attempts($this->_username, $ip_address);
+
+            return false;
         }
         // Login sukses: ubah pass di db ke bcrypt jika masih md5 dan set session
-        else {
-            if ($pwMasihMD5) {
-                // Ganti pass md5 jadi bcrypt
-                $pwBcrypt = $this->generatePasswordHash($password);
 
-                // Modifikasi panjang karakter di kolom user.password menjadi 100 untuk -
-                // backward compatibility dengan kolom di database lama yang hanya 40 karakter.
-                // Hal ini menyebabkan string bcrypt (yang default lengthnya 60 karakter) jadi -
-                // terpotong sehingga $authLolos selalu mereturn FALSE.
-                $sql = 'ALTER TABLE user MODIFY COLUMN password VARCHAR(100) NOT NULL';
-                $this->db->query($sql);
-                // Lanjut ke update password di database
-                $sql = 'UPDATE user SET password = ? WHERE id = ?';
-                $this->db->query($sql, [$pwBcrypt, $user->id]);
-            }
-            // Lanjut set session
-            if (($user->id_grup == self::GROUP_REDAKSI) && ($this->setting->offline_mode >= 2)) {
-                $this->session->siteman = -2;
-            } else {
-                return $this->setLogin($user);
-            }
+        if ($pwMasihMD5) {
+            // Ganti pass md5 jadi bcrypt
+            $pwBcrypt = $this->generatePasswordHash($password);
+
+            // Modifikasi panjang karakter di kolom user.password menjadi 100 untuk -
+            // backward compatibility dengan kolom di database lama yang hanya 40 karakter.
+            // Hal ini menyebabkan string bcrypt (yang default lengthnya 60 karakter) jadi -
+            // terpotong sehingga $authLolos selalu mereturn FALSE.
+            $sql = 'ALTER TABLE user MODIFY COLUMN password VARCHAR(100) NOT NULL';
+            $this->db->query($sql);
+            // Lanjut ke update password di database
+            $sql = 'UPDATE user SET password = ? WHERE id = ?';
+            $this->db->query($sql, [$pwBcrypt, $user->id]);
+        }
+        // Lanjut set session
+        if ($this->db->table_exists('login_attempts')) {
+            $this->clear_login_attempts($this->_username, $ip_address);
+        }
+
+        if (($user->id_grup == self::GROUP_REDAKSI) && ($this->setting->offline_mode >= 2)) {
+            $this->session->siteman = -2;
+        } else {
+            return $this->setLogin($user);
         }
     }
 
@@ -224,8 +233,25 @@ class User_model extends CI_Model
     private function filter_sql()
     {
         if (isset($_SESSION['filter'])) {
-            $filter     = $_SESSION['filter'];
-            $filter_sql = " AND u.id_grup = {$filter}";
+            $filter = $_SESSION['filter'];
+
+            switch ($filter) {
+                case 'active':
+                    $filter_sql = ' AND u.active = 1';
+                    break;
+
+                case 'inactive':
+                    $filter_sql = ' AND u.active = 0';
+                    break;
+
+                case 'all':
+                    $filter_sql = ' AND (u.active = 0 OR u.active = 1)';
+                    break;
+
+                default:
+                    $filter_sql = " AND u.id_grup = {$filter}";
+                    break;
+            }
 
             return $filter_sql;
         }
@@ -293,7 +319,8 @@ class User_model extends CI_Model
         $sql = 'SELECT u.*, p.pamong_status, g.nama as grup ' . $this->list_data_sql();
         $sql .= $order_sql;
         $sql .= $paging_sql;
-
+        // var_dump ($sql);
+        // die();
         $query = $this->db->query($sql);
         $data  = $query->result_array();
 
@@ -343,6 +370,7 @@ class User_model extends CI_Model
     {
         $data             = [];
         $data['password'] = $post['password'];
+        $data['active']   = (int) $post['aktif'];
         if (isset($post['username']) && ! empty($post['username'])) {
             $data['username'] = alfanumerik($post['username']);
         }
@@ -399,16 +427,13 @@ class User_model extends CI_Model
             redirect('man_user');
         }
 
-        if (
-            empty($data['username']) || empty($data['password'])
-                                     || empty($data['nama']) || ! in_array((int) ($data['id_grup']), $this->grup_model->list_id_grup())
-        ) {
+        if (empty($data['username']) || empty($data['nama']) || ! in_array((int) ($data['id_grup']), $this->grup_model->list_id_grup())) {
             session_error(' -> Nama, Username dan Kata Sandi harus diisi');
             redirect('man_user');
         }
 
         // radiisi menandakan password tidak diubah
-        if ($data['password'] == 'radiisi') {
+        if ($data['password'] == '') {
             unset($data['password']);
         }
         // Untuk demo jangan ubah username atau password
@@ -581,15 +606,16 @@ class User_model extends CI_Model
 
         $data['nama']           = alfanumerik_spasi($this->input->post('nama'));
         $data['notif_telegram'] = (int) $this->input->post('notif_telegram');
-        $data['id_telegram']    = alfanumerik($this->input->post('id_telegram'));
+        $data['id_telegram']    = alfanumerik(empty($this->input->post('id_telegram')) ? 0 : $this->input->post('id_telegram'));
+
         // Update foto
         $data['foto'] = $this->urusFoto($id);
         $hasil        = $this->db->where('id', $id)->update('user', $data);
 
         // Untuk Blade
-        $this->session->isAdmin = User::whereId($id)->first();
+        $this->session->isAdmin = User::findOrFail($id);
 
-        status_sukses($hasil, $gagal_saja = true);
+        status_sukses($hasil, true);
     }
 
     public function list_grup()
@@ -751,8 +777,7 @@ class User_model extends CI_Model
             return true;
         }
         // Controller yang boleh diakses oleh semua pengguna yg telah login
-
-        if ($group && in_array($controller[0], ['user_setting', 'wilayah', 'notif'])) {
+        if ($group && in_array($controller[0], ['user_setting', 'wilayah', 'notif', 'pengguna', 'tte', 'sign', 'surat_kecamatan'])) {
             return true;
         }
 
@@ -763,5 +788,94 @@ class User_model extends CI_Model
         }
 
         return $ada_akses;
+    }
+
+    /**
+     * is_max_login_attempts_exceeded
+     * Based on code from CodeIgniter-Ion-Auth, by benedmunds (https://github.com/benedmunds/CodeIgniter-Ion-Auth/blob/3/models/Ion_auth_model.php)
+     *
+     * @param string $identity   user's identity
+     * @param mixed  $ip_address
+     *
+     * @return bool
+     */
+    public function is_max_login_attempts_exceeded($identity, $ip_address)
+    {
+        if ($this->db->table_exists('login_attempts')) {
+            $max_attempts = config_item('maximum_login_attempts');
+            if ($max_attempts > 0) {
+                $attempts = $this->get_attempts_num($identity, $ip_address);
+
+                return $attempts >= $max_attempts;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get number of login attempts for the given IP-address or identity
+     * Based on code from CodeIgniter-Ion-Auth, by benedmunds (https://github.com/benedmunds/CodeIgniter-Ion-Auth/blob/3/models/Ion_auth_model.php)
+     *
+     * @param string $identity   User's identity
+     * @param mixed  $ip_address
+     *
+     * @return int
+     */
+    public function get_attempts_num($identity, $ip_address)
+    {
+        if ($this->get_last_attempt_time($identity, $ip_address) <= (time() - config_item('lockout_time'))) {
+            $this->clear_login_attempts($identity, $ip_address);
+        }
+
+        return LoginAttempts::select('1')
+            ->where('username', $identity)
+            ->where('ip_address', $ip_address)
+            ->count();
+    }
+
+    /**
+     * Based on code from CodeIgniter-Ion-Auth, by benedmunds (https://github.com/benedmunds/CodeIgniter-Ion-Auth/blob/3/models/Ion_auth_model.php)
+     *
+     * @param string $identity   User's identity
+     * @param mixed  $ip_address
+     *
+     * @return bool
+     */
+    public function increase_login_attempts($identity, $ip_address)
+    {
+        if ($this->db->table_exists('login_attempts')) {
+            $data = ['username' => $identity, 'time' => time(), 'ip_address' => $ip_address];
+            LoginAttempts::insert($data);
+            $count   = $this->get_attempts_num($identity, $ip_address);
+            $message = 'LOGIN GAGAL.<br>NAMA PENGGUNA ATAU KATA SANDI YANG ANDA MASUKKAN SALAH!<br>KESEMPATAN MENCOBA ' . (config_item('maximum_login_attempts') - $count) . ' KALI LAGI';
+
+            if ($this->is_max_login_attempts_exceeded($identity, $ip_address)) {
+                $this->session->set_flashdata('time_block', $this->get_last_attempt_time($this->_username, $ip_address));
+                $message = 'LOGIN GAGAL.<br>NAMA PENGGUNA ATAU KATA SANDI YANG ANDA MASUKKAN SALAH!';
+            }
+            $this->session->set_flashdata('attempts_error', $message);
+        }
+    }
+
+    public function get_last_attempt_time($identity, $ip_address)
+    {
+        if ($this->db->table_exists('login_attempts')) {
+            $last_try = LoginAttempts::where('username', $identity)
+                ->where('ip_address', $ip_address)
+                ->orderBy('id', 'DESC')
+                ->first();
+
+            return $last_try->time;
+        }
+
+        return time() - config_item('lockout_time');
+    }
+
+    public function clear_login_attempts($identity, $ip_address)
+    {
+        if ($this->db->table_exists('login_attempts')) {
+            return LoginAttempts::where('username', $identity)->where('ip_address', $ip_address)->delete();
+        }
     }
 }

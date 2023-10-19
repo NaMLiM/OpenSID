@@ -47,8 +47,8 @@ class Lembaran_desa extends Admin_Controller
         parent::__construct();
 
         $this->load->model(['web_dokumen_model', 'pamong_model']);
-        $this->modul_ini     = 301;
-        $this->sub_modul_ini = 302;
+        $this->modul_ini     = 'buku-administrasi-desa';
+        $this->sub_modul_ini = 'administrasi-umum';
         $this->_list_session = ['filter', 'cari', 'jenis_peraturan'];
         $this->_set_page     = ['20', '50', '100'];
     }
@@ -145,7 +145,6 @@ class Lembaran_desa extends Admin_Controller
 
     public function dialog_daftar($aksi = 'cetak', $o = 0)
     {
-        $data                    = $this->modal_penandatangan();
         $data['aksi']            = $aksi;
         $data['form_action']     = site_url("lembaran_desa/daftar/{$aksi}/{$o}");
         $data['jenis_peraturan'] = $this->referensi_model->jenis_peraturan_desa();
@@ -163,11 +162,13 @@ class Lembaran_desa extends Admin_Controller
 
     private function data_cetak($aksi)
     {
+        // TODO :: gunakan view global penandatangan
+        $ttd                    = $this->modal_penandatangan();
+        $data['pamong_ttd']     = $this->pamong_model->get_data($ttd['pamong_ttd']->pamong_id);
+        $data['pamong_ketahui'] = $this->pamong_model->get_data($ttd['pamong_ketahui']->pamong_id);
         $post                   = $this->input->post();
         $data['main']           = $this->web_dokumen_model->data_cetak($kat = 3, $post['tahun'], $post['jenis_peraturan']);
         $data['input']          = $post;
-        $data['pamong_ttd']     = $this->pamong_model->get_data($this->input->post('pamong_ttd'));
-        $data['pamong_ketahui'] = $this->pamong_model->get_data($this->input->post('pamong_ketahui'));
         $data['tahun']          = $post['tahun'];
         $data['desa']           = $this->header['desa'];
         $data['aksi']           = $aksi;

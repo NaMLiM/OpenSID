@@ -35,8 +35,6 @@
  *
  */
 
-use App\Models\Pamong;
-
 defined('BASEPATH') || exit('No direct script access allowed');
 
 class Bumindes_inventaris_kekayaan extends Admin_Controller
@@ -47,14 +45,13 @@ class Bumindes_inventaris_kekayaan extends Admin_Controller
     {
         parent::__construct();
         $this->load->model(['pamong_model', 'inventaris_laporan_model']);
-        $this->modul_ini     = 301;
-        $this->sub_modul_ini = 302;
+        $this->modul_ini     = 'buku-administrasi-desa';
+        $this->sub_modul_ini = 'administrasi-umum';
     }
 
     public function index()
     {
-        $tahun  = (empty($this->session->tahun) || $this->session->tahun == 'semua') ? date('Y') : $this->session->tahun;
-        $pamong = Pamong::penandaTangan()->get();
+        $tahun = (empty($this->session->tahun) || $this->session->tahun == 'semua') ? date('Y') : $this->session->tahun;
 
         $data = [
             'subtitle'     => 'Buku Inventaris dan Kekayaan Desa',
@@ -62,8 +59,6 @@ class Bumindes_inventaris_kekayaan extends Admin_Controller
             'main_content' => 'bumindes/umum/content_inventaris',
             'min_tahun'    => $this->inventaris_laporan_model->min_tahun(),
             'data'         => $this->inventaris_laporan_model->permen_47($tahun, null),
-            'kades'        => $data['sekdes'] = $pamong,
-            'sekdes'       => $data['sekdes'] = $pamong,
             'tahun'        => $this->session->tahun,
         ];
 

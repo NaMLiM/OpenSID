@@ -38,6 +38,7 @@
 defined('BASEPATH') || exit('No direct script access allowed');
 
 use App\Enums\SasaranEnum;
+use App\Models\Bantuan;
 use App\Models\BantuanPeserta;
 use App\Models\Config;
 use Illuminate\Support\Str;
@@ -54,7 +55,7 @@ class Program_bantuan extends Admin_Controller
     {
         parent::__construct();
         $this->load->model(['program_bantuan_model']);
-        $this->modul_ini = 6;
+        $this->modul_ini = 'bantuan';
         $this->_set_page = ['20', '50', '100'];
     }
 
@@ -338,14 +339,12 @@ class Program_bantuan extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        $this->load->library('upload');
-
-        $config['upload_path']   = LOKASI_DOKUMEN;
-        $config['allowed_types'] = 'xls|xlsx|xlsm';
-        //$config['max_size']				= max_upload() * 1024;
-        $config['file_name'] = namafile('Impor Peserta Program Bantuan');
-
-        $this->upload->initialize($config);
+        $this->load->library('MY_Upload', null, 'upload');
+        $this->upload->initialize([
+            'upload_path'   => sys_get_temp_dir(),
+            'allowed_types' => 'xls|xlsx|xlsm',
+            'file_name'     => namafile('Impor Peserta Program Bantuan'),
+        ]);
 
         if ($this->upload->do_upload('userfile')) {
             $program_id = '';
@@ -358,10 +357,8 @@ class Program_bantuan extends Admin_Controller
             $rand_kartu_peserta      = $this->input->post('rand_kartu_peserta');
 
             $upload = $this->upload->data();
-            $file   = LOKASI_DOKUMEN . $upload['file_name'];
-
             $reader = ReaderEntityFactory::createXLSXReader();
-            $reader->open($file);
+            $reader->open($upload['full_path']);
 
             $data_program = [];
             $data_peserta = [];
@@ -375,10 +372,8 @@ class Program_bantuan extends Admin_Controller
                 // Sheet Program
                 if ($sheet->getName() == 'Program') {
                     $pesan_program  = '';
-                    $ambil_program  = $this->program_bantuan_model->get_program(1, false);
-                    $daftar_program = array_column($ambil_program['program'], 'id');
-
-                    $field = ['id', 'nama', 'sasaran', 'ndesc', 'asaldana', 'sdate', 'edate'];
+                    $daftar_program = Bantuan::pluck('id')->toArray();
+                    $field          = ['id', 'nama', 'sasaran', 'ndesc', 'asaldana', 'sdate', 'edate'];
 
                     foreach ($sheet->getRowIterator() as $row) {
                         $cells = $row->getCells();
@@ -402,17 +397,16 @@ class Program_bantuan extends Admin_Controller
                              * id bernilai NULL/Kosong( )/Strip(-)/tdk valid, buat program baru dan tampilkan notifkasi tambah program
                              * id bernilai id dan valid, update data program dan tampilkan notifkasi update program
                              */
-                            case $no_baris == 0 && (in_array($value, $daftar_program) && $ganti_program == 1):
+                            case $no_baris == 0 && (in_array((int) $value, $daftar_program)):
                                 $program_id = $value;
-                                $pesan_program .= 'Data program dengan <b> id = ' . ($value) . '</b> ditemukan, data lama diganti dengan data baru <br>';
+                                if (null === $ganti_program) {
+                                    $pesan_program .= 'Data program dengan <b> id = ' . ($value) . '</b> ditemukan, data lama tetap digunakan <br>';
+                                } else {
+                                    $pesan_program .= 'Data program dengan <b> id = ' . ($value) . '</b> ditemukan, data lama diganti dengan data baru <br>';
+                                }
                                 break;
 
-                            case $no_baris == 0 && (in_array($value, $daftar_program) && $ganti_program != 1):
-                                $program_id = $value;
-                                $pesan_program .= 'Data program dengan <b> id = ' . ($value) . '</b> ditemukan, data lama tetap digunakan <br>';
-                                break;
-
-                            case $no_baris == 0 && ! in_array($value, $daftar_program):
+                            case $no_baris == 0 && ! in_array((int) $value, $daftar_program):
                                 $program_id = null;
                                 $pesan_program .= 'Data program dengan <b> id = ' . ($value) . '</b> tidak ditemukan, program baru ditambahkan secara otomatis) <br>';
                                 break;
@@ -430,10 +424,12 @@ class Program_bantuan extends Admin_Controller
 
                 // Sheet Peserta
                 else {
-                    $pesan_peserta     = '';
-                    $ambil_peserta     = $this->program_bantuan_model->get_program(1, $program_id);
-                    $sasaran           = $ambil_peserta[0]['sasaran'];
-                    $terdaftar_peserta = array_column($ambil_peserta[1], 'peserta');
+                    $pesan_peserta = '';
+                    $ambil_peserta = Bantuan::select('id', 'sasaran')->with(['peserta' => static function ($query) {
+                        $query->select('program_id', 'peserta');
+                    }])->find($program_id);
+                    $sasaran           = (int) $ambil_peserta->sasaran;
+                    $terdaftar_peserta = $ambil_peserta->peserta->pluck('peserta')->toArray();
 
                     if ($kosongkan_peserta == 1) {
                         $pesan_peserta .= '- Data peserta ' . ($ambil_peserta[0]['nama']) . ' sukses dikosongkan<br>';
@@ -542,7 +538,6 @@ class Program_bantuan extends Admin_Controller
                 }
             }
             $reader->close();
-            unlink($file);
 
             $notif = [
                 'program' => $pesan_program,
@@ -557,7 +552,8 @@ class Program_bantuan extends Admin_Controller
             redirect("{$this->controller}/detail/{$program_id}");
         }
 
-        return session_error($this->upload->display_errors());
+        session_error($this->upload->display_errors());
+        redirect($this->controller);
     }
 
     // TODO: function ini terlalu panjang dan sebaiknya dipecah menjadi beberapa method

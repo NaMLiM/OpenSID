@@ -47,8 +47,8 @@ class Kehadiran_rekapitulasi extends Admin_Controller
     public function __construct()
     {
         parent::__construct();
-        $this->modul_ini          = 337;
-        $this->sub_modul_ini      = 341;
+        $this->modul_ini          = 'kehadiran';
+        $this->sub_modul_ini      = 'rekapitulasi';
         $this->header['kategori'] = 'kehadiran';
     }
 
@@ -86,7 +86,7 @@ class Kehadiran_rekapitulasi extends Admin_Controller
                     return date('H:i', strtotime($row->total));
                 })
                 ->editColumn('status_kehadiran', static function ($row) {
-                    $tipe = ($row->status_kehadiran === 'hadir') ? 'success' : (($row->status_kehadiran == 'keluar') ? 'danger' : 'warning');
+                    $tipe = ($row->status_kehadiran == 'hadir') ? 'success' : (($row->status_kehadiran == 'tidak berada di kantor') ? 'danger' : 'warning');
 
                     return '<span class="label label-' . $tipe . '">' . ucwords($row->status_kehadiran) . ' </span>';
                 })

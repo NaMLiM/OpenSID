@@ -35,7 +35,6 @@
  *
  */
 
-use App\Models\Anjungan;
 use App\Models\Config;
 use App\Models\GrupAkses;
 use App\Models\LogSurat;
@@ -92,13 +91,7 @@ class MY_Controller extends CI_Controller
         $this->request = $this->input->post();
 
         // Untuk anjungan
-        if (Schema::hasColumn('anjungan', 'tipe')) {
-            if (! cek_anjungan() && Anjungan::exists()) {
-                try {
-                    Anjungan::tipe(1)->update(['status' => 0]);
-                } catch (Exception $e) {
-                }
-            }
+        if (Schema::hasColumn('anjungan', 'tipe') && Schema::hasColumn('anjungan', 'status_alasan')) {
             $this->cek_anjungan = $this->anjungan_model->cek_anjungan();
         }
 
@@ -126,7 +119,7 @@ class Web_Controller extends MY_Controller
     {
         parent::__construct();
 
-        $this->header = Schema::hasColumn('tweb_desa_pamong', 'jabatan_id') ? Config::first() : null;
+        $this->header = Schema::hasColumn('tweb_desa_pamong', 'jabatan_id') && Schema::hasColumn('config', 'nomor_operator') ? Config::first() : null;
 
         if ($this->setting->offline_mode == 2) {
             $this->view_maintenance();
@@ -179,7 +172,7 @@ class Web_Controller extends MY_Controller
         // Data statistik pengunjung
         $data['statistik_pengunjung'] = $this->statistik_pengunjung->get_statistik();
 
-        $data['latar_website'] = $this->theme_model->latar_website();
+        $data['latar_website'] = default_file($this->theme_model->lokasi_latar_website() . $this->setting->latar_website, DEFAULT_LATAR_WEBSITE);
         $data['desa']          = $this->header;
         $data['menu_atas']     = $this->first_menu_m->list_menu_atas();
         $data['menu_kiri']     = $this->first_menu_m->list_menu_kiri();
@@ -284,7 +277,7 @@ class Admin_Controller extends MY_Controller
     {
         parent::__construct();
         $this->CI = CI_Controller::get_instance();
-        $this->load->model(['header_model', 'user_model', 'notif_model', 'referensi_model']);
+        $this->load->model(['header_model', 'user_model', 'notif_model', 'pelanggan_model', 'referensi_model']);
         $this->header = $this->header_model->get_data();
 
         // Kalau sehabis periksa data, paksa harus login lagi
@@ -313,23 +306,23 @@ class Admin_Controller extends MY_Controller
         $this->header['notif_permohonan_surat'] = $this->notif_model->permohonan_surat_baru();
         $this->header['notif_inbox']            = $this->notif_model->inbox_baru();
         $this->header['notif_komentar']         = $this->notif_model->komentar_baru();
-        $this->header['notif_langganan']        = $this->notif_model->status_langganan();
+        $this->header['notif_langganan']        = $this->pelanggan_model->status_langganan();
         $this->header['notif_pesan_opendk']     = $cek_kotak_pesan ? Pesan::where('sudah_dibaca', '=', 0)->where('diarsipkan', '=', 0)->count() : 0;
         $this->header['notif_pengumuman']       = $this->cek_pengumuman();
         $isAdmin                                = $this->session->isAdmin->pamong;
         $this->header['notif_permohonan']       = 0;
         if ($this->db->field_exists('verifikasi_operator', 'log_surat') && $this->db->field_exists('deleted_at', 'log_surat')) {
-            $this->header['notif_permohonan'] = LogSurat::whereNull('deleted_at')->when($isAdmin->jabatan_id == '1', static function ($q) {
+            $this->header['notif_permohonan'] = LogSurat::whereNull('deleted_at')->when($isAdmin->jabatan_id == kades()->id, static function ($q) {
                 return $q->when(setting('tte') == 1, static function ($tte) {
                     return $tte->where('verifikasi_kades', '=', 0)->orWhere('tte', '=', 0);
                 })->when(setting('tte') == 0, static function ($tte) {
                     return $tte->where('verifikasi_kades', '=', 0);
                 });
             })
-                ->when($isAdmin->jabatan_id == '2', static function ($q) {
+                ->when($isAdmin->jabatan_id == sekdes()->id, static function ($q) {
                     return $q->where('verifikasi_sekdes', '=', '0');
                 })
-                ->when($isAdmin == null || ! in_array($isAdmin->jabatan_id, ['1', '2']), static function ($q) {
+                ->when($isAdmin == null || ! in_array($isAdmin->jabatan_id, [kades()->id, sekdes()->id]), static function ($q) {
                     return $q->where('verifikasi_operator', '=', '0')->orWhere('verifikasi_operator', '=', '-1');
                 })
                 ->count();
@@ -338,7 +331,7 @@ class Admin_Controller extends MY_Controller
         // cek langganan premium
         $info_langganan = $this->cache->file->get_metadata('status_langganan');
 
-        if ((strtotime('+1 day', $info_langganan['mtime']) < strtotime('now')) || ($this->cache->file->get_metadata('status_langganan') == false && $this->setting->layanan_opendesa_token != null)) {
+        if ((strtotime('+30 day', $info_langganan['mtime']) < strtotime('now')) || ($this->cache->file->get_metadata('status_langganan') == false && $this->setting->layanan_opendesa_token != null)) {
             $this->header['perbaharui_langganan'] = true;
         }
     }
@@ -438,8 +431,33 @@ class Admin_Controller extends MY_Controller
 
         return [
             'pamong'         => Pamong::penandaTangan()->get(),
-            'pamong_ttd'     => Pamong::ttd('a.n')->first(),
+            'pamong_ttd'     => Pamong::sekretarisDesa()->first(),
             'pamong_ketahui' => Pamong::kepalaDesa()->first(),
         ];
+    }
+
+    protected function set_hak_akses_rfm()
+    {
+        // reset dulu session yang berkaitan hak akses ubah dan hapus
+        $this->session->hapus_gambar_rfm       = false;
+        $this->session->ubah_tambah_gambar_rfm = false;
+
+        if (can('h')) {
+            $this->session->hapus_gambar_rfm = true;
+        }
+        if (can('u')) {
+            $this->session->ubah_tambah_gambar_rfm = true;
+        }
+    }
+}
+
+class Anjungan_Controller extends Admin_Controller
+{
+    public function __construct()
+    {
+        parent::__construct();
+        if (! cek_anjungan()) {
+            redirect('anjungan');
+        }
     }
 }

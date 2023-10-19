@@ -52,6 +52,9 @@
 
 				<!-- numeral js -->
 				<script src="<?= asset('js/numeraljs/numeral.min.js') ?>"></script>
+
+				<!-- Sweet Alert -->
+				<script src="<?= asset('js/sweetalert2/sweetalert2.all.min.js') ?>"></script>
 				<script type="text/javascript">
 					numeral.register("locale", "id-id", {
 						delimiters: {
@@ -82,6 +85,10 @@
 					<script src="<?= asset('js/demo.js') ?>"></script>
 				<?php endif ?>
 
+				<?php if (! setting('inspect_element')): ?>
+					<script src="<?= asset('js/disabled.min.js') ?>"></script>
+				<?php endif ?>
+
 				<!-- set timezone -->
 				<script>
 					$.extend($.fn.datetimepicker.defaults, {
@@ -100,8 +107,8 @@
 							cek_koneksi();
 						}
 
-						var success = '<?= addslashes($this->session->success) ?>';
-						var message = '<?= addslashes($this->session->error_msg) ?>';
+						var success = `<?= addslashes($this->session->success) ?>`;
+						var message = `<?= addslashes($this->session->error_msg) ?>`;
 
 						if (success == 1) {
 							notify = 'success';

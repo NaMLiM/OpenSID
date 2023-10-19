@@ -39,7 +39,6 @@ namespace App\Models;
 
 use App\Traits\Author;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Log;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -163,6 +162,7 @@ class FormatSurat extends BaseModel
         'satuan_masa_berlaku',
         'qr_code',
         'logo_garuda',
+        'kecamatan',
         'syarat_surat',
         'template',
         'template_desa',

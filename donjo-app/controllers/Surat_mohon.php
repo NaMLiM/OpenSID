@@ -46,8 +46,8 @@ class Surat_mohon extends Admin_Controller
     public function __construct()
     {
         parent::__construct();
-        $this->modul_ini     = 4;
-        $this->sub_modul_ini = 97;
+        $this->modul_ini     = 'layanan-surat';
+        $this->sub_modul_ini = 'daftar-persyaratan';
     }
 
     public function index()
@@ -107,7 +107,7 @@ class Surat_mohon extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
-        if (SyaratSurat::insert(static::validate($this->request))) {
+        if (SyaratSurat::create(static::validate($this->request))) {
             redirect_with('success', 'Berhasil Tambah Data');
         }
         redirect_with('error', 'Gagal Tambah Data');

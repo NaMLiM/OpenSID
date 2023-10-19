@@ -52,8 +52,8 @@ class Surat_masuk extends Admin_Controller
         $this->load->model('pamong_model');
 
         $this->load->model('penomoran_surat_model');
-        $this->modul_ini     = 301;
-        $this->sub_modul_ini = 302;
+        $this->modul_ini     = 'buku-administrasi-desa';
+        $this->sub_modul_ini = 'administrasi-umum';
         $this->tab_ini       = 2;
     }
 
@@ -87,6 +87,7 @@ class Surat_masuk extends Admin_Controller
             $_SESSION['per_page'] = $_POST['per_page'];
         }
 
+        $this->surat_masuk_model->remove_character();
         $data['per_page']         = $_SESSION['per_page'];
         $data['paging']           = $this->surat_masuk_model->paging($p, $o);
         $data['main']             = $this->surat_masuk_model->list_data($o, $data['paging']->offset, $data['paging']->per_page);
@@ -118,7 +119,7 @@ class Surat_masuk extends Admin_Controller
             $data['disposisi_surat_masuk']     = null;
         }
 
-        $data['ref_disposisi'] = RefJabatan::where('id', '!=', RefJabatan::KADES)->pluck('nama', 'id');
+        $data['ref_disposisi'] = RefJabatan::urut()->latest()->pluck('nama', 'id')->except(kades()->id);
 
         // Buang unique id pada link nama file
         $berkas                             = explode('__sid__', $data['surat_masuk']['berkas_scan']);
@@ -205,45 +206,37 @@ class Surat_masuk extends Admin_Controller
     // TODO: Satukan dialog cetak dan unduh
     public function dialog_cetak($o = 0)
     {
-        $data                = $this->modal_penandatangan();
         $data['aksi']        = 'Cetak';
         $data['tahun_surat'] = $this->surat_masuk_model->list_tahun_surat();
-        $data['form_action'] = site_url("surat_masuk/cetak/{$o}");
+        $data['form_action'] = site_url("surat_masuk/dialog/cetak/{$o}");
         $this->load->view('surat_masuk/ajax_cetak', $data);
     }
 
     // TODO: Satukan dialog cetak dan unduh
     public function dialog_unduh($o = 0)
     {
-        $data                = $this->modal_penandatangan();
         $data['aksi']        = 'Unduh';
         $data['tahun_surat'] = $this->surat_masuk_model->list_tahun_surat();
-        $data['form_action'] = site_url("surat_masuk/unduh/{$o}");
+        $data['form_action'] = site_url("surat_masuk/dialog/unduh/{$o}");
         $this->load->view('surat_masuk/ajax_cetak', $data);
     }
 
-    // TODO: Satukan aksi cetak dan unduh
-    public function cetak($o = 0)
+    public function dialog($aksi = 'unduh', $o = 0)
     {
+        // TODO :: gunakan view global penandatangan
+        $ttd                    = $this->modal_penandatangan();
+        $data['pamong_ttd']     = $this->pamong_model->get_data($ttd['pamong_ttd']->pamong_id);
+        $data['pamong_ketahui'] = $this->pamong_model->get_data($ttd['pamong_ketahui']->pamong_id);
         $data['input']          = $_POST;
         $_SESSION['filter']     = $data['input']['tahun'];
-        $data['pamong_ttd']     = $this->pamong_model->get_data($_POST['pamong_ttd']);
-        $data['pamong_ketahui'] = $this->pamong_model->get_data($_POST['pamong_ketahui']);
         $data['desa']           = $this->header['desa'];
         $data['main']           = $this->surat_masuk_model->list_data($o, 0, 10000);
-        $this->load->view('surat_masuk/surat_masuk_print', $data);
-    }
 
-    // TODO: Satukan aksi cetak dan unduh
-    public function unduh($o = 0)
-    {
-        $data['input']          = $_POST;
-        $_SESSION['filter']     = $data['input']['tahun'];
-        $data['pamong_ttd']     = $this->pamong_model->get_data($_POST['pamong_ttd']);
-        $data['pamong_ketahui'] = $this->pamong_model->get_data($_POST['pamong_ketahui']);
-        $data['desa']           = $this->header['desa'];
-        $data['main']           = $this->surat_masuk_model->list_data($o, 0, 10000);
-        $this->load->view('surat_masuk/surat_masuk_excel', $data);
+        if ($aksi == 'unduh') {
+            $this->load->view('surat_masuk/surat_masuk_excel', $data);
+        } else {
+            $this->load->view('surat_masuk/surat_masuk_print', $data);
+        }
     }
 
     public function disposisi($id)
@@ -252,7 +245,7 @@ class Surat_masuk extends Admin_Controller
         $data['desa']                  = $this->header['desa'];
         $data['pamong_ttd']            = $this->pamong_model->get_data($_POST['pamong_ttd']);
         $data['pamong_ketahui']        = $this->pamong_model->get_data($_POST['pamong_ketahui']);
-        $data['ref_disposisi']         = RefJabatan::select(['id', 'nama'])->where('id', '!=', RefJabatan::KADES)->get();
+        $data['ref_disposisi']         = RefJabatan::select(['id', 'nama'])->urut()->latest()->get()->except(kades()->id);
         $data['disposisi_surat_masuk'] = DisposisiSuratmasuk::where('id_surat_masuk', $id)->pluck('disposisi_ke')->toArray();
         $data['surat']                 = $this->surat_masuk_model->get_surat_masuk($id);
         $this->load->view('surat_masuk/disposisi', $data);

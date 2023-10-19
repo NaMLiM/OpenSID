@@ -118,7 +118,11 @@ class Database_model extends MY_Model
         '23.03'   => ['migrate' => 'migrasi_2303_ke_2304', 'nextVersion' => '23.04'],
         '23.04'   => ['migrate' => 'migrasi_2304_ke_2305', 'nextVersion' => '23.05'],
         '23.05'   => ['migrate' => 'migrasi_2305_ke_2306', 'nextVersion' => '23.06'],
-        '23.06'   => ['migrate' => 'migrasi_2306_ke_2307', 'nextVersion' => null],
+        '23.06'   => ['migrate' => 'migrasi_2306_ke_2307', 'nextVersion' => '23.07'],
+        '23.07'   => ['migrate' => 'migrasi_2307_ke_2308', 'nextVersion' => '23.08'],
+        '23.08'   => ['migrate' => 'migrasi_2308_ke_2309', 'nextVersion' => '23.09'],
+        '23.09'   => ['migrate' => 'migrasi_2309_ke_2310', 'nextVersion' => '23.10'],
+        '23.10'   => ['migrate' => 'migrasi_2310_ke_2311', 'nextVersion' => null],
     ];
 
     // versi lain
@@ -183,6 +187,9 @@ class Database_model extends MY_Model
     private function cekCurrentVersion()
     {
         $version = setting('current_version');
+        if ($version == null) { // versi tidak terdeteksi dari modul periksa.
+            $version = SettingAplikasi::where('key', 'current_version')->first()->value;
+        }
 
         // Jalankan migrasi dari awal jika migrasi dari sid lain (misalnya SID CRI)
         if (in_array($version, $this->otherVersions)) {
@@ -212,12 +219,13 @@ class Database_model extends MY_Model
         $versi          = $this->cekCurrentVersion();
         $nextVersion    = $versi;
         $versionMigrate = $this->versionMigrate;
+
         if (isset($versionMigrate[$versi])) {
             while (! empty($nextVersion) && ! empty($versionMigrate[$nextVersion]['migrate'])) {
                 $migrate     = $versionMigrate[$nextVersion]['migrate'];
                 $nextVersion = $versionMigrate[$nextVersion]['nextVersion'];
                 if (method_exists($this, $migrate)) {
-                    log_message('error', 'Jalankan ' . $migrate);
+                    log_message('notice', 'Jalankan ' . $migrate);
                     call_user_func(__NAMESPACE__ . '\\Database_model::' . $migrate);
                 } else {
                     $this->jalankan_migrasi($migrate);
@@ -252,7 +260,7 @@ class Database_model extends MY_Model
             Migrasi::where('versi_database', '=', VERSI_DATABASE)->update(['premium' => $this->session->daftar_migrasi]);
         }
 
-        log_message('error', 'Versi database sudah terbaru');
+        log_message('notice', 'Versi database sudah terbaru');
     }
 
     // Cek apakah migrasi perlu dijalankan
@@ -318,6 +326,21 @@ class Database_model extends MY_Model
 
     private function migrasi_1905_ke_1906()
     {
+        // null kan tanggal perkawinan jika tanggal 0000-00-00
+        if ($this->db->field_exists('tanggalperkawinan', 'tweb_penduduk')) {
+            $this->db->where('tanggalperkawinan', '0000-00-00')->update('tweb_penduduk', ['tanggalperkawinan' => null]);
+        }
+
+        // null kan tanggal perceraian jika tanggal 0000-00-00
+        if ($this->db->field_exists('tanggalperceraian', 'tweb_penduduk')) {
+            $this->db->where('tanggalperceraian', '0000-00-00')->update('tweb_penduduk', ['tanggalperceraian' => null]);
+        }
+
+        // null kan tanggal tanggal_akhir_paspor jika tanggal 0000-00-00
+        if ($this->db->field_exists('tanggal_akhir_paspor', 'tweb_penduduk')) {
+            $this->db->where('tanggal_akhir_paspor', '0000-00-00')->update('tweb_penduduk', ['tanggal_akhir_paspor' => null]);
+        }
+
         // Tambah kolom waktu update dan user pengupdate
         if (! $this->db->field_exists('created_at', 'tweb_penduduk')) {
             // Tambah kolom
@@ -371,7 +394,7 @@ class Database_model extends MY_Model
                 `urut` int(5),
                 `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `created_by` int(11) NOT NULL,
-                `updated_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+                `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `updated_by` int(11),
                 `status` int(1) NOT NULL DEFAULT '0',
                 PRIMARY KEY (id)
@@ -3480,6 +3503,7 @@ class Database_model extends MY_Model
                 'surat_permohonan_cerai',
                 'surat_ket_rujuk_cerai',
             ];
+
             // Jenis surat yang bukan bagian rilis sistem sudah otomatis berisi nilai default (yaitu, 2)
             foreach ($surat_sistem as $url_surat) {
                 $this->db->where('url_surat', $url_surat)->update('tweb_surat_format', ['jenis' => 1]);

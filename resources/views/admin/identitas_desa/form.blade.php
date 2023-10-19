@@ -21,7 +21,7 @@
         <div class="col-md-3">
             <div class="box box-primary">
                 <div class="box-body box-profile">
-                    <img class="profile-user-img img-responsive img-circle" src="{{ gambar_desa($main->logo) }}"
+                    <img class="profile-user-img img-responsive img-circle" src="{{ gambar_desa($main->path_logo) }}"
                         alt="Logo">
                     <br />
                     <p class="text-center text-bold">Lambang {{ ucwords($setting->sebutan_desa) }}</p>
@@ -36,7 +36,7 @@
                     </div>
                     <div class="input-group input-group-sm">
                         <input type="text" class="form-control" id="file_path">
-                        <input type="file" class="hidden" id="file" name="logo">
+                        <input type="file" class="hidden" id="file" name="logo" accept=".gif,.jpg,.jpeg,.png">
                         <input type="hidden" name="old_logo" value="{{ $main->logo }}">
                         <span class="input-group-btn">
                             <button type="button" class="btn btn-info btn-flat" id="file_browser"><i
@@ -47,7 +47,7 @@
             </div>
             <div class="box box-primary">
                 <div class="box-body box-profile">
-                    <img class="img-responsive" src="{{ gambar_desa($main->kantor_desa, true) }}"
+                    <img class="img-responsive" src="{{ gambar_desa($main->path_kantor_desa, true) }}"
                         alt="Kantor {{ ucwords($setting->sebutan_desa) }}">
                     <br />
                     <p class="text-center text-bold">Kantor {{ ucwords($setting->sebutan_desa) }}</p>
@@ -56,7 +56,8 @@
                     <br />
                     <div class="input-group input-group-sm">
                         <input type="text" class="form-control" id="file_path2">
-                        <input type="file" class="hidden" id="file2" name="kantor_desa">
+                        <input type="file" class="hidden" id="file2" name="kantor_desa"
+                            accept=".gif,.jpg,.jpeg,.png">
                         <input type="hidden" name="old_kantor_desa" value="{{ $main->kantor_desa }}">
                         <span class="input-group-btn">
                             <button type="button" class="btn btn-info btn-flat" id="file_browser2"><i
@@ -146,12 +147,21 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="col-sm-3 control-label" for="telepon">Telpon
+                        <label class="col-sm-3 control-label" for="telepon">Nomor Telpon
                             {{ ucwords($setting->sebutan_desa) }}</label>
                         <div class="col-sm-8">
                             <input id="telepon" name="telepon" class="form-control input-sm bilangan" type="text"
                                 maxlength="15" placeholder="Telpon {{ ucwords($setting->sebutan_desa) }}"
                                 value="{{ $main->telepon }}" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="col-sm-3 control-label" for="telepon">Nomor Ponsel
+                            {{ ucwords($setting->sebutan_desa) }}</label>
+                        <div class="col-sm-8">
+                            <input id="telepon-operator" name="nomor_operator" class="form-control input-sm bilangan"
+                                type="text" maxlength="15" placeholder="Nomor Ponsel"
+                                value="{{ $main->nomor_operator }}" />
                         </div>
                     </div>
                     <div class="form-group">
@@ -324,26 +334,52 @@
                         processData: false,
                         contentType: false,
                     })
-                    .done(function(response) {
-                        if (response.status) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Berhasil Ubah Data',
+                    .done(function() {
+                        $.ajax({
+                                url: `<?= config_item('server_layanan') ?>/api/v1/pelanggan/pemesanan`,
+                                headers: {
+                                    "Authorization": `Bearer <?= setting('layanan_opendesa_token') ?>`,
+                                    "X-Requested-With": `XMLHttpRequest`,
+                                },
+                                type: 'Post',
                             })
-                            window.location.replace(`${SITE_URL}identitas_desa`);
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Gagal Ubah Data',
-                                text: response.message,
+                            .done(function(response) {
+                                let data = {
+                                    body: response
+                                }
+                                $.ajax({
+                                        url: `${SITE_URL}pelanggan/pemesanan`,
+                                        type: 'Post',
+                                        dataType: 'json',
+                                        data: data,
+                                    })
+                                    .done(function() {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: 'berhasil ubah data',
+                                        })
+                                        window.location.replace(`${SITE_URL}identitas_desa`);
+                                    })
+                                    .fail(function(e) {
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: 'berhasil ubah data',
+                                        })
+                                        window.location.replace(`${SITE_URL}identitas_desa`);
+                                    });
                             })
-                        }
+                            .fail(function() {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'berhasil ubah data',
+                                })
+                                window.location.replace(`${SITE_URL}identitas_desa`);
+                            });
                     })
-                    .fail(function(response) {
+                    .fail(function() {
                         Swal.fire({
                             icon: 'error',
                             title: 'Gagal Ubah Data',
-                            text: response.message,
                         })
                     });
             });

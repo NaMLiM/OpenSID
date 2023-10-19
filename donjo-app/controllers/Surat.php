@@ -35,10 +35,12 @@
  *
  */
 
+use App\Enums\SHDKEnum;
 use App\Enums\StatusEnum;
 use App\Libraries\TinyMCE;
 use App\Models\Config;
 use App\Models\FormatSurat;
+use App\Models\Keluarga;
 use App\Models\LogSurat;
 use App\Models\Pamong;
 use App\Models\Penduduk;
@@ -57,8 +59,8 @@ class Surat extends Admin_Controller
     {
         parent::__construct();
         $this->load->model(['penduduk_model', 'keluarga_model', 'surat_model', 'keluar_model', 'penomoran_surat_model', 'permohonan_surat_model']);
-        $this->modul_ini     = 4;
-        $this->sub_modul_ini = 31;
+        $this->modul_ini     = 'layanan-surat';
+        $this->sub_modul_ini = 'cetak-surat';
         $this->tinymce       = new TinyMCE();
     }
 
@@ -152,6 +154,7 @@ class Surat extends Admin_Controller
 
     public function pratinjau($url, $id = null)
     {
+        $this->set_hak_akses_rfm();
         if ($id) {
             // Ganti status menjadi 'Menunggu Tandatangan'
             $this->permohonan_surat_model->proses($id, 2);
@@ -161,14 +164,19 @@ class Surat extends Admin_Controller
 
         if ($surat && $this->request) {
             // Simpan data ke log_surat sebagai draf
+            $id_pamong = $this->ttd($this->request['pilih_atas_nama'], $this->request['pamong_id']);
+            $pamong    = Pamong::find($id_pamong);
             $log_surat = [
                 'id_format_surat' => $surat->id,
                 'id_pend'         => $this->request['nik'], // nik = id_pend
-                'id_pamong'       => $this->ttd($this->request['pilih_atas_nama'], $this->request['pamong_id']),
+                'id_pamong'       => $id_pamong,
+                'nama_jabatan'    => $pamong->jabatan->nama,
+                'nama_pamong'     => $pamong->pamong_nama,
                 'tanggal'         => Carbon::now(),
                 'bulan'           => date('m'),
                 'tahun'           => date('Y'),
                 'no_surat'        => $this->request['nomor'],
+                'keterangan'      => $this->request['keterangan'] ?: $this->request['keperluan'],
             ];
 
             if ($log_surat['id_pend']) {
@@ -187,7 +195,7 @@ class Surat extends Admin_Controller
             $log_surat['isi_surat'] = preg_replace('/\\\\/', '', $setting_header) . '<!-- pagebreak -->' . ($surat->template_desa ?: $surat->template) . '<!-- pagebreak -->' . preg_replace('/\\\\/', '', $setting_footer);
 
             // Lewati ganti kode_isian
-            $isi_surat = $this->replceKodeIsian($log_surat);
+            $isi_surat = $this->tinymce->replceKodeIsian($log_surat);
 
             unset($log_surat['isi_surat']);
             $this->session->log_surat = $log_surat;
@@ -210,15 +218,20 @@ class Surat extends Admin_Controller
         // Cetak Konsep
         $cetak = $this->session->log_surat;
         if ($cetak) {
+            $id_pamong = $this->ttd($this->request['pilih_atas_nama'], $this->request['pamong_id']);
+            $pamong    = Pamong::find($id_pamong);
             $log_surat = [
                 'id_format_surat' => $cetak['id_format_surat'],
                 'id_pend'         => $cetak['id_pend'], // nik = id_pend
-                'id_pamong'       => $this->ttd($cetak['input']['pilih_atas_nama'], $cetak['input']['pamong_id']),
+                'id_pamong'       => $id_pamong,
+                'nama_jabatan'    => $pamong->jabatan->nama,
+                'nama_pamong'     => $pamong->pamong_nama,
                 'id_user'         => auth()->id,
                 'tanggal'         => Carbon::now(),
                 'bulan'           => date('m'),
                 'tahun'           => date('Y'),
                 'no_surat'        => $cetak['input']['nomor'],
+                'keterangan'      => $cetak['keterangan'],
             ];
 
             if ($nik = $cetak['input']['nik']) {
@@ -234,7 +247,7 @@ class Surat extends Admin_Controller
             $log_surat['input']     = $cetak['input'];
             $log_surat['isi_surat'] = $this->request['isi_surat'];
 
-            $isi_surat = $this->replceKodeIsian($log_surat);
+            $isi_surat = $this->tinymce->replceKodeIsian($log_surat);
 
             // Pisahkan isian surat
             $isi_surat  = str_replace('<p><!-- pagebreak --></p>', '', $isi_surat);
@@ -275,7 +288,7 @@ class Surat extends Admin_Controller
             $logo_qrcode    = str_replace('[logo_bsre]', $bsre, $logo_bsre);
 
             // QR_Code Surat
-            if ($cetak['surat']['qr_code']) {
+            if ($cetak['surat']['qr_code'] && ((setting('tte') == 1 && $surat->verifikasi_kades == LogSurat::TERIMA) || (setting('tte') == 0))) {
                 $cek = $this->surat_model->buatQrCode($surat->nama_surat);
 
                 $qrcode         = ($cek['viewqr']) ? '<img src="' . $cek['viewqr'] . '" width="90" height="90" alt="qrcode-surat" />' : '';
@@ -333,10 +346,14 @@ class Surat extends Admin_Controller
         $cetak = $this->session->log_surat;
 
         if ($cetak) {
+            $id_pamong = $this->ttd($this->request['pilih_atas_nama'], $this->request['pamong_id']);
+            $pamong    = Pamong::find($id_pamong);
             $log_surat = [
                 'id_format_surat' => $cetak['id_format_surat'],
                 'id_pend'         => $cetak['id_pend'], // nik = id_pend
-                'id_pamong'       => $this->ttd($cetak['input']['pilih_atas_nama'], $cetak['input']['pamong_id']),
+                'id_pamong'       => $id_pamong,
+                'nama_jabatan'    => $pamong->jabatan->nama,
+                'nama_pamong'     => $pamong->pamong_nama,
                 'id_user'         => auth()->id,
                 'tanggal'         => Carbon::now(),
             ];
@@ -402,6 +419,11 @@ class Surat extends Admin_Controller
             $logo      = (is_file($file_logo)) ? '<img src="' . $file_logo . '" width="90" height="90" alt="logo-surat" />' : '';
             $isi_cetak = str_replace('[logo]', $logo, $isi_cetak);
 
+            // Logo BSrE
+            $file_logo_bsre = FCPATH . LOGO_BSRE;
+            $bsre           = (is_file($file_logo_bsre) && setting('tte') == 1) ? '<img src="' . $file_logo_bsre . '" height="90" alt="logo-bsre" />' : '';
+            $isi_cetak      = str_replace('[logo_bsre]', $bsre, $isi_cetak);
+
             // QR_Code Surat
             if ($cetak['surat']['qr_code']) {
                 $cek       = $this->surat_model->buatQrCode($nama_surat);
@@ -464,7 +486,7 @@ class Surat extends Admin_Controller
             }
 
             $log_surat['id'] = $surat->id;
-            $isi_surat       = $this->replceKodeIsian($log_surat);
+            $isi_surat       = $this->tinymce->replceKodeIsian($log_surat);
 
             unset($log_surat['isi_surat']);
             $this->session->log_surat = $log_surat;
@@ -488,29 +510,6 @@ class Surat extends Admin_Controller
         }
 
         return Pamong::kepalaDesa()->first()->pamong_id;
-    }
-
-    private function replceKodeIsian($data = [], $kecuali = [])
-    {
-        $result = $data['isi_surat'];
-
-        $kodeIsian = $this->tinymce->getFormatedKodeIsian($data, true);
-
-        if ((int) $data['surat']['masa_berlaku'] == 0) {
-            $result = str_replace('[mulai_berlaku] s/d [berlaku_sampai]', '-', $result);
-        }
-
-        foreach ($kodeIsian as $key => $value) {
-            if (in_array($key, $kecuali)) {
-                $result = $result;
-            } elseif (in_array($key, ['[atas_nama]', '[format_nomor_surat]'])) {
-                $result = str_replace($key, $value, $result);
-            } else {
-                $result = case_replace($key, $value, $result);
-            }
-        }
-
-        return $result;
     }
 
     private function nama_surat_arsip($url, $nik, $nomor)
@@ -537,14 +536,18 @@ class Surat extends Admin_Controller
 
     private function cetak_doc($url)
     {
-        $format                 = $this->surat_model->get_surat($url);
-        $log_surat['url_surat'] = $format['id'];
-        $log_surat['id_pamong'] = $this->ttd($this->request['pilih_atas_nama'], $this->request['pamong_id']);
-        $log_surat['id_user']   = $_SESSION['user'];
-        $log_surat['no_surat']  = $_POST['nomor'];
-        $id                     = $_POST['nik'];
-        $keperluan              = $_POST['keperluan'];
-        $keterangan             = $_POST['keterangan'];
+        $format                    = $this->surat_model->get_surat($url);
+        $id_pamong                 = $this->ttd($this->request['pilih_atas_nama'], $this->request['pamong_id']);
+        $pamong                    = Pamong::find($id_pamong);
+        $log_surat['url_surat']    = $format['id'];
+        $log_surat['nama_jabatan'] = $pamong->jabatan->nama;
+        $log_surat['nama_pamong']  = $pamong->pamong_nama;
+        $log_surat['id_user']      = $_SESSION['user'];
+        $log_surat['no_surat']     = $_POST['nomor'];
+        $id                        = $_POST['nik'];
+        $keperluan                 = $_POST['keperluan'];
+        $keterangan                = $_POST['keterangan'];
+        $log_surat['id_pamong']    = $id_pamong;
 
         switch ($url) {
             case 'surat_ket_kelahiran':
@@ -653,6 +656,11 @@ class Surat extends Admin_Controller
             $filters = collect($data['surat']['form_isian']->individu)->toArray();
 
             $data['penduduk'] = Penduduk::filters($filters)->get();
+            if ($filters['kk_level'] == SHDKEnum::KEPALA_KELUARGA) {
+                $data['anggota'] = Keluarga::find($data['individu']['id_kk'])->anggota;
+            } else {
+                $data['anggota'] = null;
+            }
         }
 
         $data['surat_terakhir']     = $this->surat_model->get_last_nosurat_log($url);

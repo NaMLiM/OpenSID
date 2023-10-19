@@ -48,7 +48,7 @@ class Laporan_inventaris extends Admin_Controller
     {
         parent::__construct();
         $this->load->model(['inventaris_laporan_model', 'pamong_model', 'surat_model']);
-        $this->modul_ini     = 15;
+        $this->modul_ini     = 'sekretariat';
         $this->sub_modul_ini = 61;
     }
 
@@ -140,30 +140,24 @@ class Laporan_inventaris extends Admin_Controller
         $this->render('inventaris/laporan/table_permen47', $data);
     }
 
-    public function permendagri_47_cetak($kades, $sekdes, $asset = null)
+    public function permendagri_47_dialog($aksi = 'cetak', $asset = null)
     {
+        // TODO :: gunakan view global penandatangan
+        $ttd                    = $this->modal_penandatangan();
+        $data['pamong_ttd']     = $this->pamong_model->get_data($ttd['pamong_ttd']->pamong_id);
+        $data['pamong_ketahui'] = $this->pamong_model->get_data($ttd['pamong_ketahui']->pamong_id);
+
         $tahun           = (isset($this->session->tahun)) ? $this->session->tahun : date('Y');
         $data['header']  = Config::first();
-        $data['kades']   = $this->pamong_model->get_data($kades);
-        $data['sekdes']  = $this->pamong_model->get_data($sekdes);
         $data['data']    = $this->inventaris_laporan_model->permen_47($tahun, $asset);
-        $data['tahun']   = $tahun;
+        $data['tahun']   = $this->session->tahun;
         $data['tanggal'] = date('d / M / y');
 
-        $this->load->view('inventaris/laporan/permen47_print', $data);
-    }
-
-    public function permendagri_47_excel($kades, $sekdes, $asset = null)
-    {
-        $tahun           = (isset($this->session->tahun)) ? $this->session->tahun : date('Y');
-        $data['header']  = Config::first();
-        $data['kades']   = $this->pamong_model->get_data($kades);
-        $data['sekdes']  = $this->pamong_model->get_data($sekdes);
-        $data['data']    = $this->inventaris_laporan_model->permen_47($tahun, $asset);
-        $data['tahun']   = $tahun;
-        $data['tanggal'] = date('d / M / y');
-
-        $this->load->view('inventaris/laporan/permen47_excel', $data);
+        if ($aksi == 'unduh') {
+            $this->load->view('inventaris/laporan/permen47_excel', $data);
+        } else {
+            $this->load->view('inventaris/laporan/permen47_print', $data);
+        }
     }
 
     // TODO: Ini digunakan dimana pada view

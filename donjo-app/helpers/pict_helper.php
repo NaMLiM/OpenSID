@@ -39,7 +39,8 @@ define('FOTO_DEFAULT_PRIA', base_url() . 'assets/images/pengguna/kuser.png');
 define('FOTO_DEFAULT_WANITA', base_url() . 'assets/images/pengguna/wuser.png');
 
 define('MIME_TYPE_SIMBOL', serialize([
-    'image/png',  'image/x-png', ]));
+    'image/png',  'image/x-png',
+]));
 
 define('EXT_SIMBOL', serialize([
     '.png',
@@ -58,7 +59,8 @@ define('MIME_TYPE_DOKUMEN', serialize([
     'application/powerpoint',
     'application/vnd.ms-powerpoint',
     'application/vnd.ms-excel',
-    'application/msexcel', ]));
+    'application/msexcel',
+]));
 
 define('EXT_DOKUMEN', serialize([
     '.pdf', '.ppt', '.pptx', '.pps', '.ppsx',
@@ -67,7 +69,8 @@ define('EXT_DOKUMEN', serialize([
 
 define('MIME_TYPE_GAMBAR', serialize([
     'image/jpeg', 'image/pjpeg',
-    'image/png',  'image/x-png', ]));
+    'image/png',  'image/x-png',
+]));
 
 define('EXT_GAMBAR', serialize([
     '.jpg', '.jpeg', '.png',
@@ -75,7 +78,8 @@ define('EXT_GAMBAR', serialize([
 
 define('MIME_TYPE_ARSIP', serialize([
     'application/rar', 'application/x-rar', 'application/x-rar-compressed', 'application/octet-stream',
-    'application/zip', 'application/x-zip', 'application/x-zip-compressed', ]));
+    'application/zip', 'application/x-zip', 'application/x-zip-compressed',
+]));
 
 define('EXT_ARSIP', serialize([
     '.zip', '.rar',
@@ -101,7 +105,7 @@ function tambahSuffixUniqueKeNamaFile($namaFile, $urlEncode = true, $delimiter =
     $namaFile           = is_string($namaFile) ? $namaFile : (string) $namaFile;
     $urlEncode          = is_bool($urlEncode) ? $urlEncode : true;
     $delimiterUniqueKey = (! is_string($delimiter) || empty($delimiter))
-    ? '__sid__' : $delimiter;
+        ? '__sid__' : $delimiter;
 
     // Pastikan nama file tidak mengandung string milik $this->delimiterUniqueKey
     $namaFile = str_replace($delimiterUniqueKey, '__', $namaFile);
@@ -112,7 +116,7 @@ function tambahSuffixUniqueKeNamaFile($namaFile, $urlEncode = true, $delimiter =
     $namaFileUnik = implode('.', $namaFileUnik);
 
     return urlencode($namaFileUnik) .
-    $delimiterUniqueKey . generator() . '.' . $ekstensiFile;
+        $delimiterUniqueKey . generator() . '.' . $ekstensiFile;
     // Contoh return:
     // - nama asli = 'kitten.jpg'
     // - nama unik = 'kitten__sid__xUCc8KO.jpg'
@@ -163,13 +167,13 @@ function UploadFoto($fupload_name, $old_foto)
     $ci                      = &get_instance();
     $config['upload_path']   = LOKASI_USER_PICT;
     $config['allowed_types'] = 'jpg|png|jpeg';
-    $ci->load->library('upload');
+    $ci->load->library('MY_Upload', null, 'upload');
     $ci->upload->initialize($config);
 
     if (! $ci->upload->do_upload('foto')) {
         session_error($ci->upload->display_errors());
 
-        return false;
+        redirect($_SERVER['HTTP_REFERER']);
     }
     $uploadedImage = $ci->upload->data();
     if ($old_foto != '') {
@@ -224,7 +228,7 @@ function UploadGambar($fupload_name, $old_gambar)
 
 function AmbilGaleri($foto, $ukuran)
 {
-    return base_url() . LOKASI_GALERI . $ukuran . '_' . $foto;
+    return base_url(LOKASI_GALERI . $ukuran . '_' . $foto);
 }
 
 // $file_upload = $_FILES['<lokasi>']
@@ -342,7 +346,7 @@ function UploadSimbolx($fupload_name, $old_gambar)
 
 function AmbilFotoArtikel($foto, $ukuran)
 {
-    return base_url() . LOKASI_FOTO_ARTIKEL . $ukuran . '_' . $foto;
+    return base_url(LOKASI_FOTO_ARTIKEL . $ukuran . '_' . $foto);
 }
 
 function UploadArtikel($fupload_name, $gambar)
@@ -376,32 +380,41 @@ function HapusArtikel($gambar)
     return true;
 }
 
-function UploadPeta($fupload_name, $lokasi)
+function UploadPeta($fupload_name, $lokasi, $old_foto = null)
 {
-    $ci                      = &get_instance();
-    $config['upload_path']   = $lokasi;
-    $config['allowed_types'] = 'gif|jpg|png|jpeg';
+    $ci = &get_instance();
     $ci->load->library('MY_Upload', null, 'upload');
-    $ci->upload->initialize($config);
+    $ci->upload->initialize([
+        'upload_path'   => $lokasi,
+        'allowed_types' => 'gif|jpg|png|jpeg',
+    ]);
 
     if (! $ci->upload->do_upload('foto')) {
-        session_error($ci->upload->display_errors());
+        session_error($ci->upload->display_errors(null, null));
 
-        return false;
+        redirect($_SERVER['HTTP_REFERER']);
+    } else {
+        $uploadedImage = $ci->upload->data();
+        ResizeGambar($uploadedImage['full_path'], $lokasi . 'kecil_' . $fupload_name, ['width' => 120, 'height' => 100]);
+        ResizeGambar($uploadedImage['full_path'], $lokasi . 'sedang_' . $fupload_name, ['width' => 880, 'height' => 660]);
+
+        unlink($uploadedImage['full_path']);
+
+        // Hapus gambar lama
+        if ($old_foto) {
+            unlink($lokasi . 'kecil_' . $old_foto);
+            unlink($lokasi . 'sedang_' . $old_foto);
+        }
+
+        return $fupload_name;
     }
-    $uploadedImage = $ci->upload->data();
-    ResizeGambar($uploadedImage['full_path'], $lokasi . 'kecil_' . $fupload_name, ['width' => 120, 'height' => 100]);
-    ResizeGambar($uploadedImage['full_path'], $lokasi . 'sedang_' . $fupload_name, ['width' => 880, 'height' => 660]);
-
-    unlink($uploadedImage['full_path']);
-
-    return true;
 }
 
 function ResizeGambar($filename, $path, $dimensi)
 {
     $source_path = $filename;
     $target_path = $path;
+    $imgdata     = exif_read_data($target_path, 'IFD0');
 
     $config_manip = [
         'image_library'  => 'gd2',
@@ -423,6 +436,26 @@ function ResizeGambar($filename, $path, $dimensi)
         return false;
     }
     $ci->image_lib->clear();
+
+    //putar gambar
+    $config['image_library'] = 'gd2';
+    $config['source_image']  = $path;
+
+    switch($imgdata['Orientation']) {
+        case 3:
+            $config['rotation_angle'] = '180';
+            break;
+
+        case 6:
+            $config['rotation_angle'] = '270';
+            break;
+
+        case 8:
+            $config['rotation_angle'] = '90';
+            break;
+    }
+    $ci->image_lib->initialize($config);
+    $ci->image_lib->rotate();
 }
 
 // $dimensi = array("width"=>lebar, "height"=>tinggi)
@@ -636,6 +669,7 @@ function bersihkan_namafile($nama)
     $nama = trim($nama, '-');
     // remove duplicate -
     $nama = preg_replace('~-+~', '-', $nama);
+
     // lowercase
     return strtolower($nama . $ext);
 }
@@ -770,4 +804,30 @@ function to_base64($file)
     $data = file_get_contents($file);
 
     return 'data:image/' . $type . ';base64,' . base64_encode($data);
+}
+
+function home_noimage()
+{
+    return to_base64(LOKASI_FILES_LOGO . 'home.png');
+}
+
+function unggah_file($config = [], $old_file = null)
+{
+    $ci = &get_instance();
+    $ci->load->library('MY_Upload', null, 'upload');
+    $ci->upload->initialize($config);
+
+    if (! $ci->upload->do_upload('file')) {
+        session_error($ci->upload->display_errors(null, null));
+
+        redirect($_SERVER['HTTP_REFERER']);
+    }
+
+    $data = $ci->upload->data();
+
+    if ($old_file) {
+        unlink($config['upload_path'] . $old_file);
+    }
+
+    return $data['file_name'];
 }

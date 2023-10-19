@@ -44,8 +44,8 @@ class Bumindes_tanah_kas_desa extends Admin_Controller
         parent::__construct();
         $this->load->model(['tanah_kas_desa_model', 'pamong_model', 'data_persil_model']);
         $this->controller    = 'bumindes_tanah_kas_desa';
-        $this->modul_ini     = 301;
-        $this->sub_modul_ini = 302;
+        $this->modul_ini     = 'buku-administrasi-desa';
+        $this->sub_modul_ini = 'administrasi-umum';
     }
 
     public function index()
@@ -170,6 +170,7 @@ class Bumindes_tanah_kas_desa extends Admin_Controller
     {
         $data              = $this->modal_penandatangan();
         $data['aksi']      = $aksi;
+        $data['headjs']    = false;
         $data['main']      = $this->tanah_kas_desa_model->cetak_tanah_kas_desa();
         $data['config']    = $this->header['desa'];
         $data['bulan']     = $this->session->filter_bulan ?: date('m');

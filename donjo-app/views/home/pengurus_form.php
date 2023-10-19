@@ -1,10 +1,11 @@
 <div class="content-wrapper">
 	<section class="content-header">
-		<h1>Staf Pemerintahan <?= ucwords($this->setting->sebutan_desa)?></h1>
+		<?php $pemerintah = 'Staf ' . ucwords(setting('sebutan_pemerintah_desa')) ?>
+		<h1><?= $pemerintah ?></h1>
 		<ol class="breadcrumb">
 			<li><a href="<?= site_url('hom_sid'); ?>"><i class="fa fa-home"></i> Home</a></li>
-			<li><a href="<?= site_url('pengurus'); ?>">Daftar Staf Pemerintahan</a></li>
-			<li class="active">Staf Pemerintahan <?= ucwords($this->setting->sebutan_desa); ?></li>
+			<li><a href="<?= site_url('pengurus'); ?>">Daftar <?= $pemerintah ?></a></li>
+			<li class="active"><?= $pemerintah ?></li>
 		</ol>
 	</section>
 	<section class="content" id="maincontent">
@@ -44,7 +45,7 @@
 			</div>
 		</div>
 		<div class="row">
-			<form id="validasi" action="<?= $form_action; ?>" method="POST" enctype="multipart/form-data" class="form-horizontal">
+			<?= form_open_multipart($form_action, 'id="validasi-proses" class="form-horizontal"') ?>
 				<input type="hidden" name="id_pend" value="<?= $individu['id']?>">
 				<div class="col-md-3">
 					<?php
@@ -164,7 +165,7 @@
 							<div class="form-group">
 								<label class="col-sm-4 control-label" for="pamong_pangkat">Pangkat / Golongan</label>
 								<div class="col-sm-7">
-									<input name="pamong_pangkat" class="form-control input-sm" type="text" placeholder="Pangkat / Golongan" value="<?= $pamong['pamong_pangkat']?>" ></input>
+									<input name="pamong_pangkat" class="form-control input-sm" type="text" maxlength="20" placeholder="Pangkat / Golongan" value="<?= $pamong['pamong_pangkat']?>" ></input>
 								</div>
 							</div>
 							<div class="form-group">

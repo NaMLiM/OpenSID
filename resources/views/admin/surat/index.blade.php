@@ -24,7 +24,7 @@
                 @endforeach
             </select>
         </div>
-
+        
         {!! form_open($formAction, 'id="validasi"') !!}
         <div class="box-body">
             <div class="table-responsive">

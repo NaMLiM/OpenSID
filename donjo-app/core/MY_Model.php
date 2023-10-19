@@ -295,13 +295,13 @@ class MY_Model extends CI_Model
 
     public function jalankan_migrasi($migrasi)
     {
-        if (in_array($migrasi, $this->session->daftar_migrasi)) {
+        if (is_array($this->session->daftar_migrasi) && in_array($migrasi, $this->session->daftar_migrasi)) {
             return true;
         }
 
         $this->load->model('migrations/' . $migrasi);
         if ($this->{$migrasi}->up()) {
-            log_message('error', 'Berhasil Jalankan ' . $migrasi);
+            log_message('notice', 'Berhasil Jalankan ' . $migrasi);
 
             $_SESSION['daftar_migrasi'][] = $migrasi;
 

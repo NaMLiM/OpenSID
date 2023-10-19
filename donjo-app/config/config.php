@@ -250,6 +250,7 @@ $config['allow_get_array'] = true;
 |	2 = Debug Messages
 |	3 = Informational Messages
 |	4 = All Messages
+|	5 = Notice Messages
 |
 | You can also pass an array with threshold levels to show individual error types
 |
@@ -259,7 +260,7 @@ $config['allow_get_array'] = true;
 | your log files will fill up very fast.
 |
 */
-$config['log_threshold'] = 1;
+$config['log_threshold'] = [1, 5];
 
 /*
 |--------------------------------------------------------------------------
@@ -624,7 +625,7 @@ $config['api_idm'] = 'https://idm.kemendesa.go.id/open/api/desa/rumusan';
 |--------------------------------------------------------------------------
 |
 */
-$config['api_sdgs'] = 'https://sid.kemendesa.go.id/sdgs/searching/score-sdgs?';
+$config['api_sdgs'] = 'https://sid.kemendesa.go.id/sdgs/searching/score-sdgs?location_code=';
 
 /*
 |--------------------------------------------------------------------------
@@ -641,3 +642,12 @@ $config['views_blade'] = RESOURCESPATH . 'views/';
 |
 */
 $config['cache_blade'] = STORAGEPATH . 'framework/views/';
+
+/*
+|--------------------------------------------------------------------------
+| failed login attempts
+|--------------------------------------------------------------------------
+|
+*/
+$config['maximum_login_attempts'] = 3;
+$config['lockout_time']           = 300;                 // The number of seconds to lockout an account due to exceeded attempts

@@ -50,6 +50,10 @@ class Pengaduan extends Web_Controller
 
     public function index($p = 1)
     {
+        if (! $this->web_menu_model->menu_aktif('pengaduan')) {
+            show_404();
+        }
+
         $data = $this->includes;
         $this->_get_common_data($data);
 
@@ -77,13 +81,10 @@ class Pengaduan extends Web_Controller
     public function kirim()
     {
         $this->load->library('Telegram/telegram');
-
-        // Periksa isian captcha
-        include FCPATH . 'securimage/securimage.php';
-        $securimage = new Securimage();
-
         $post = $this->input->post();
-        if ($securimage->check($post['captcha_code']) == false) {
+        // Periksa isian captcha
+        $captcha = new App\Libraries\Captcha();
+        if (! $captcha->check($this->input->post('captcha_code'))) {
             $notif = [
                 'status' => 'error',
                 'pesan'  => 'Kode captcha anda salah. Silakan ulangi lagi.',

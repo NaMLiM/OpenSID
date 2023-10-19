@@ -300,38 +300,27 @@ class Web_dokumen_model extends MY_Model
         return array_diff($semua_mime_type, ['application/octet-stream']);
     }
 
-    private function semua_ext()
+    private function upload_dokumen()
     {
-        return array_merge(unserialize(EXT_DOKUMEN), unserialize(EXT_GAMBAR), unserialize(EXT_ARSIP));
-    }
-
-    private function upload_dokumen($data, $file_lama = '')
-    {
-        $satuan                  = $_POST['satuan'];
-        $old_satuan              = $_POST['old_satuan'];
-        $filename                = $_FILES['satuan']['name'];
-        $ext                     = get_extension($filename);
-        $nama_file               = str_replace(".{$nama_akhiran}", '', $filename);
-        $nama_file               = bersihkan_namafile(substr($nama_file, 0, 180) . ".{$ext}");
+        $old_file                = $this->input->post('old_file', true);
         $config['upload_path']   = LOKASI_DOKUMEN;
-        $config['allowed_types'] = 'gif|jpg|png|jpeg';
-        $config['file_name']     = $nama_file;
+        $config['allowed_types'] = 'jpg|jpeg|png|pdf';
+        $config['file_name']     = namafile($this->input->post('nama', true));
 
         $this->load->library('MY_Upload', null, 'upload');
         $this->upload->initialize($config);
 
         if (! $this->upload->do_upload('satuan')) {
-            session_error($this->upload->display_errors());
+            session_error($this->upload->display_errors(null, null));
 
             return false;
         }
 
-        if ($old_satuan != '') {
-            // Hapus old_satuan
-            unlink(LOKASI_DOKUMEN . $old_satuan);
+        if (empty($old_file)) {
+            unlink(LOKASI_DOKUMEN . $old_file);
         }
 
-        return $nama_file;
+        return $this->upload->data()['file_name'];
     }
 
     public function insert($mandiri = false)
@@ -340,7 +329,7 @@ class Web_dokumen_model extends MY_Model
         $post   = $this->input->post();
         $data   = $this->validasi($post);
         if (! empty($post['satuan'])) {
-            $data['satuan'] = $result = $this->upload_dokumen($post);
+            $data['satuan'] = $result = $this->upload_dokumen();
             if ($result == false) {
                 return false;
             }
@@ -375,12 +364,12 @@ class Web_dokumen_model extends MY_Model
     {
         $data                         = [];
         $data['nama']                 = nomor_surat_keputusan($post['nama']);
-        $data['kategori']             = $post['kategori'] ?: 1;
-        $data['kategori_info_publik'] = $post['kategori_info_publik'] ?: null;
-        $data['id_syarat']            = $post['id_syarat'] ?: null;
-        $data['id_pend']              = $post['id_pend'] ?: 0;
-        $data['tipe']                 = $post['tipe'];
-        $data['url']                  = $post['url'] ?: null;
+        $data['kategori']             = (int) $post['kategori'] ?: 1;
+        $data['kategori_info_publik'] = (int) $post['kategori_info_publik'] ?: null;
+        $data['id_syarat']            = (int) $post['id_syarat'] ?: null;
+        $data['id_pend']              = (int) $post['id_pend'] ?: 0;
+        $data['tipe']                 = (int) $post['tipe'];
+        $data['url']                  = $this->security->xss_clean($post['url']) ?: null;
 
         if ($data['tipe'] == 1) {
             $data['url'] = null;
@@ -395,11 +384,11 @@ class Web_dokumen_model extends MY_Model
                 $data['tahun']                 = date('Y', strtotime($post['attr']['tgl_kep_kades']));
                 $data['kategori_info_publik']  = '3';
                 $data['attr']['tgl_kep_kades'] = $post['attr']['tgl_kep_kades'];
-                $data['attr']['uraian']        = htmlentities($post['attr']['uraian']);
+                $data['attr']['uraian']        = $this->security->xss_clean($post['attr']['uraian']);
                 $data['attr']['no_kep_kades']  = nomor_surat_keputusan($post['attr']['no_kep_kades']);
                 $data['attr']['no_lapor']      = nomor_surat_keputusan($post['attr']['no_lapor']);
                 $data['attr']['tgl_lapor']     = $post['attr']['tgl_lapor'];
-                $data['attr']['keterangan']    = htmlentities($post['attr']['keterangan']);
+                $data['attr']['keterangan']    = $this->security->xss_clean($post['attr']['keterangan']);
                 break;
 
             case 3: //Perdes
@@ -408,7 +397,7 @@ class Web_dokumen_model extends MY_Model
                 $data['attr']['tgl_ditetapkan']    = $post['attr']['tgl_ditetapkan'];
                 $data['attr']['tgl_lapor']         = $post['attr']['tgl_lapor'];
                 $data['attr']['tgl_kesepakatan']   = $post['attr']['tgl_kesepakatan'];
-                $data['attr']['uraian']            = htmlentities($post['attr']['uraian']);
+                $data['attr']['uraian']            = $this->security->xss_clean($post['attr']['uraian']);
                 $data['attr']['jenis_peraturan']   = htmlentities($post['attr']['jenis_peraturan']);
                 $data['attr']['no_ditetapkan']     = nomor_surat_keputusan($post['attr']['no_ditetapkan']);
                 $data['attr']['no_lapor']          = nomor_surat_keputusan($post['attr']['no_lapor']);
@@ -443,7 +432,7 @@ class Web_dokumen_model extends MY_Model
             ->get('dokumen')->row()->satuan;
         $data['satuan'] = $old_file;
         if (! empty($post['satuan'])) {
-            $data['satuan'] = $this->upload_dokumen($post, $old_file);
+            $data['satuan'] = $this->upload_dokumen();
             $retval &= ! (empty($data['satuan']));
             if (! $retval) {
                 return $retval;
@@ -537,6 +526,7 @@ class Web_dokumen_model extends MY_Model
 
         // cek jika dokumen ini juga ada di anggota yang lain
         $anggota_lain = $this->get_dokumen_di_anggota_lain($id);
+
         // soft delete dokumen anggota lain jika ada
         foreach ($anggota_lain as $item) {
             $this->db->where('id', $item['id'])->update('dokumen', $data);
@@ -675,6 +665,7 @@ class Web_dokumen_model extends MY_Model
                     // Informasi publik
                     $this->db->where('tahun', $tahun);
                     break;
+
                     // Data tanggal berbeda menurut kategori dokumen
                     // Informasi masing2 kategori dokumen tersimpan dalam format json di kolom attr
                     // MySQL baru memiliki fitur query json mulai dari 5.7; jadi di sini dilakukan secara manual
@@ -775,6 +766,7 @@ class Web_dokumen_model extends MY_Model
 					end
 				end) as aksi
 		");
+
         // Termasuk data yg sudah dihapus
         return $this->db->from('dokumen')
             ->where('id_pend', '0')

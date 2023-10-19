@@ -58,10 +58,6 @@ class Dtks extends BaseModel
     protected $guarded = [];
 
     protected $appends = [
-        'kepala_keluarga',
-        'jumlah_keluarga',
-        'jumlah_anggota_dtks',
-        'no_kk_art',
         'versi_kuisioner_name',
     ];
     protected $casts = [
@@ -120,7 +116,19 @@ class Dtks extends BaseModel
         $this->loadMissing([
             'rtm.anggota' => static function ($builder) {
                 // override all items within the $with property in Penduduk
-                $builder->withOnly('');
+                $builder->without([
+                    'jenisKelamin',
+                    'agama',
+                    'pendidikan',
+                    'pendidikanKK',
+                    'pekerjaan',
+                    'wargaNegara',
+                    'golonganDarah',
+                    'cacat',
+                    'statusKawin',
+                    'pendudukStatus',
+                    'wilayah',
+                ]);
                 // hanya ambil data anggota yg masih hidup (tweb_penduduk)
                 $builder->where('status_dasar', 1);
             },

@@ -161,38 +161,42 @@ class Pembangunan_model extends MY_Model
     private function validasi($post, $id = null)
     {
         return [
-            'sumber_dana'             => $post['sumber_dana'],
-            'judul'                   => $post['judul'],
+            'sumber_dana'             => bersihkan_xss($post['sumber_dana']),
+            'judul'                   => judul($post['judul']),
             'slug'                    => unique_slug($this->table, $post['judul'], $id),
-            'volume'                  => $post['volume'],
-            'waktu'                   => $post['waktu'],
+            'volume'                  => bersihkan_xss($post['volume']),
+            'waktu'                   => bilangan($post['waktu']),
             'satuan_waktu'            => bilangan($post['satuan_waktu']),
-            'tahun_anggaran'          => $post['tahun_anggaran'],
-            'pelaksana_kegiatan'      => $post['pelaksana_kegiatan'],
-            'id_lokasi'               => $post['lokasi'] ? null : $post['id_lokasi'],
-            'lokasi'                  => $post['id_lokasi'] ? null : $post['lokasi'],
-            'keterangan'              => $post['keterangan'],
+            'tahun_anggaran'          => bilangan($post['tahun_anggaran']),
+            'pelaksana_kegiatan'      => bersihkan_xss($post['pelaksana_kegiatan']),
+            'id_lokasi'               => $post['lokasi'] ? null : bilangan($post['id_lokasi']),
+            'lokasi'                  => $post['id_lokasi'] ? null : $this->security->xss_clean(bersihkan_xss($post['lokasi'])),
+            'keterangan'              => $this->security->xss_clean(bersihkan_xss($post['keterangan'])),
             'foto'                    => $this->upload_gambar_pembangunan('foto'),
-            'anggaran'                => $post['anggaran'],
-            'sumber_biaya_pemerintah' => $post['sumber_biaya_pemerintah'],
-            'sumber_biaya_provinsi'   => $post['sumber_biaya_provinsi'],
-            'sumber_biaya_kab_kota'   => $post['sumber_biaya_kab_kota'],
-            'sumber_biaya_swadaya'    => $post['sumber_biaya_swadaya'],
-            'sumber_biaya_jumlah'     => $post['sumber_biaya_pemerintah'] + $post['sumber_biaya_provinsi'] + $post['sumber_biaya_kab_kota'] + $post['sumber_biaya_swadaya'],
-            'manfaat'                 => $post['manfaat'],
-            'sifat_proyek'            => $post['sifat_proyek'],
+            'anggaran'                => bilangan($post['anggaran']),
+            'sumber_biaya_pemerintah' => bilangan($post['sumber_biaya_pemerintah']),
+            'sumber_biaya_provinsi'   => bilangan($post['sumber_biaya_provinsi']),
+            'sumber_biaya_kab_kota'   => bilangan($post['sumber_biaya_kab_kota']),
+            'sumber_biaya_swadaya'    => bilangan($post['sumber_biaya_swadaya']),
+            'sumber_biaya_jumlah'     => bilangan($post['sumber_biaya_pemerintah']) + bilangan($post['sumber_biaya_provinsi']) + bilangan($post['sumber_biaya_kab_kota']) + bilangan($post['sumber_biaya_swadaya']),
+            'manfaat'                 => $this->security->xss_clean(bersihkan_xss($post['manfaat'])),
+            'sifat_proyek'            => bersihkan_xss($post['sifat_proyek']),
             'updated_at'              => date('Y-m-d H:i:s'),
         ];
     }
 
     private function upload_gambar_pembangunan($jenis)
     {
-        $this->load->library('upload');
+        // Inisialisasi library 'upload'
+        $this->load->library('MY_Upload', null, 'upload');
         $this->uploadConfig = [
             'upload_path'   => LOKASI_GALERI,
-            'allowed_types' => 'gif|jpg|jpeg|png',
-            'max_size'      => max_upload() * 1024,
+            'allowed_types' => 'jpg|jpeg|png',
+            'max_size'      => 1024, // 1 MB
         ];
+        $this->upload->initialize($this->uploadConfig);
+
+        $uploadData = null;
         // Adakah berkas yang disertakan?
         $adaBerkas = ! empty($_FILES[$jenis]['name']);
         if ($adaBerkas !== true) {
@@ -205,16 +209,7 @@ class Pembangunan_model extends MY_Model
 
             return $this->input->post('old_foto');
         }
-        // Tes tidak berisi script PHP
-        if (isPHP($_FILES['logo']['tmp_name'], $_FILES[$jenis]['name'])) {
-            $this->session->success   = -1;
-            $this->session->error_msg = ' -> Jenis file ini tidak diperbolehkan ';
-            redirect('identitas_desa');
-        }
 
-        $uploadData = null;
-        // Inisialisasi library 'upload'
-        $this->upload->initialize($this->uploadConfig);
         // Upload sukses
         if ($this->upload->do_upload($jenis)) {
             $uploadData = $this->upload->data();
@@ -228,11 +223,15 @@ class Pembangunan_model extends MY_Model
             // Ganti nama di array upload jika file berhasil di-rename --
             // jika rename gagal, fallback ke nama asli
             $uploadData['file_name'] = $fileRenamed ? $namaFileUnik : $uploadData['file_name'];
+
+            // Hapus file lama
+            unlink(LOKASI_GALERI . $this->input->post('old_foto'));
         }
         // Upload gagal
         else {
-            $this->session->success   = -1;
-            $this->session->error_msg = $this->upload->display_errors(null, null);
+            session_error($this->upload->display_errors(null, null));
+
+            return redirect('admin_pembangunan');
         }
 
         return (! empty($uploadData)) ? $uploadData['file_name'] : null;
@@ -249,7 +248,14 @@ class Pembangunan_model extends MY_Model
 
     public function delete($id)
     {
-        return $this->db->where('id', $id)->delete($this->table);
+        $data = $this->find($id);
+
+        if ($outp = $this->db->where('id', $id)->delete($this->table)) {
+            // Hapus file
+            unlink(LOKASI_GALERI . $data->foto);
+        }
+
+        status_sukses($outp);
     }
 
     public function find($id)

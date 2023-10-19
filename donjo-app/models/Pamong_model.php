@@ -40,6 +40,7 @@ use App\Models\KehadiranPengaduan;
 use App\Models\LogSurat;
 use App\Models\Pamong;
 use App\Models\RefJabatan;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 defined('BASEPATH') || exit('No direct script access allowed');
@@ -228,7 +229,7 @@ class Pamong_model extends CI_Model
 
         $this->foto($post);
 
-        if ($data['jabatan_id'] == '1') {
+        if ($data['jabatan_id'] == kades()->id) {
             $this->ttd('pamong_ttd', $post['id'], 1);
         } else {
             $this->ttd('pamong_ub', $post['id'], 1);
@@ -242,7 +243,7 @@ class Pamong_model extends CI_Model
         $post = $this->input->post();
         $data = $this->siapkan_data($post);
 
-        if (! in_array($data['jabatan_id'], ['1', '2'])) {
+        if (! in_array($data['jabatan_id'], RefJabatan::getKadesSekdes())) {
             $data['pamong_ttd'] = $data['pamong_ub'] = 0;
         }
 
@@ -250,7 +251,7 @@ class Pamong_model extends CI_Model
         $post['id'] = $id;
         $this->foto($post);
 
-        if ($data['jabatan_id'] == '1') {
+        if ($data['jabatan_id'] == kades()->id) {
             $this->ttd('pamong_ttd', $post['id'], 1);
         } else {
             $this->ttd('pamong_ub', $post['id'], 1);
@@ -338,9 +339,9 @@ class Pamong_model extends CI_Model
         $data['gelar_depan']        = strip_tags($post['gelar_depan']) ?: null;
         $data['gelar_belakang']     = strip_tags($post['gelar_belakang']) ?: null;
 
-        if ($data['jabatan_id'] == RefJabatan::KADES) {
+        if ($data['jabatan_id'] == kades()->id) {
             $data['urut'] = 1;
-        } elseif ($data['jabatan_id'] == RefJabatan::SEKDES) {
+        } elseif ($data['jabatan_id'] == sekdes()->id) {
             $data['urut'] = 2;
         } else {
             $data['urut'] = $this->urut_model->urut_max() + 1;
@@ -374,23 +375,23 @@ class Pamong_model extends CI_Model
         $pamong = Pamong::findOrFail($id);
 
         if ($jenis == 'a.n') {
-            if ($pamong->jabatan_id == '2') {
-                $output = Pamong::where('jabatan_id', 2)->find($id)->update(['pamong_ttd' => $val]);
+            if ($pamong->jabatan_id == sekdes()->id) {
+                $output = Pamong::where('jabatan_id', sekdes()->id)->find($id)->update(['pamong_ttd' => $val]);
 
                 // Hanya 1 yang bisa jadi a.n dan harus sekretaris
                 if ($output) {
                     Pamong::where('pamong_ttd', 1)->where('pamong_id', '!=', $id)->update(['pamong_ttd' => 0]);
                 }
             } else {
-                $pesan = ', Penandatangan a.n harus ' . RefJabatan::whereId(2)->first(['nama'])->nama;
+                $pesan = ', Penandatangan a.n harus ' . RefJabatan::whereJenis(RefJabatan::SEKDES)->first(['nama'])->nama;
             }
         }
 
         if ($jenis == 'u.b') {
-            if (! in_array($pamong->jabatan_id, RefJabatan::EXCLUDE_DELETE)) {
-                $output = Pamong::whereNotIn('jabatan_id', RefJabatan::EXCLUDE_DELETE)->find($id)->update(['pamong_ub' => $val]);
+            if (! in_array($pamong->jabatan_id, RefJabatan::getKadesSekdes())) {
+                $output = Pamong::whereNotIn('jabatan_id', RefJabatan::getKadesSekdes())->find($id)->update(['pamong_ub' => $val]);
             } else {
-                $pesan = ', Penandatangan u.b harus pamong selain ' . RefJabatan::whereId(1)->first(['nama'])->nama . ' dan ' . RefJabatan::whereId(2)->first(['nama'])->nama;
+                $pesan = ', Penandatangan u.b harus pamong selain ' . RefJabatan::whereJenis(RefJabatan::KADES)->first(['nama'])->nama . ' dan ' . RefJabatan::whereJenis(RefJabatan::SEKDES)->first(['nama'])->nama;
             }
         }
 
@@ -466,7 +467,7 @@ class Pamong_model extends CI_Model
 
         $data_query = $this->db
             ->select(
-                'rj.nama AS jabatan, dp.pamong_niap, k.tanggal, k.status_kehadiran,
+                'dp.pamong_id, rj.nama AS jabatan, dp.pamong_niap, dp.gelar_depan, dp.gelar_belakang,
                 CASE WHEN dp.id_pend IS NULL THEN dp.foto ELSE p.foto END as foto,
                 CASE WHEN p.sex IS NOT NULL THEN p.sex ELSE dp.pamong_sex END as id_sex,
                 CASE WHEN dp.id_pend IS NULL THEN dp.pamong_nama ELSE p.nama END AS nama',
@@ -474,20 +475,22 @@ class Pamong_model extends CI_Model
             )
             ->from('tweb_desa_pamong dp')
             ->join('tweb_penduduk p', 'p.id = dp.id_pend', 'left')
-            ->join('kehadiran_perangkat_desa k', 'k.pamong_id = dp.pamong_id', 'left')
             ->join('ref_jabatan rj', 'rj.id = dp.jabatan_id', 'left')
             ->where('dp.pamong_status', '1')
             ->order_by('dp.urut')
             ->get()
             ->result_array();
 
-        foreach ($data_query as $key => $perangkat) {
-            $perangkat['foto'] = AmbilFoto($perangkat['foto'], 'besar', $perangkat['id_sex']);
-            $key               = $perangkat['nama'];
-            $data[$key]        = $perangkat;
-        }
+        return ['daftar_perangkat' => collect($data_query)->map(static function ($item) {
+            $kehadiran                = Kehadiran::where('pamong_id', $item['pamong_id'])->where('tanggal', Carbon::now()->format('Y-m-d'))->orderBy('id', 'DESC')->first();
+            $item['status_kehadiran'] = $kehadiran ? $kehadiran->status_kehadiran : null;
+            $item['tanggal']          = $kehadiran ? $kehadiran->tanggal : null;
+            $item['foto']             = AmbilFoto($item['foto'], 'besar', $item['id_sex']);
+            $item['nama']             = gelar($item['gelar_depan'], $item['nama'], $item['gelar_belakang']);
 
-        return ['daftar_perangkat' => array_values($data)];
+            return $item;
+        })->toArray(),
+        ];
     }
 
     //----------------------------------------------------------------------------------------------------
@@ -502,7 +505,7 @@ class Pamong_model extends CI_Model
         $jabatan_aktif = Pamong::whereJabatanId($pamong->jabatan_id)->wherePamongStatus(1)->exists();
 
         // Cek untuk kades atau sekdes apakah sudah ada yang aktif saat mengaktifkan
-        if ($val == 1 && $jabatan_aktif && in_array($pamong->jabatan_id, RefJabatan::EXCLUDE_DELETE)) {
+        if ($val == 1 && $jabatan_aktif && in_array($pamong->jabatan_id, RefJabatan::getKadesSekdes())) {
             return session_error('<br>Pamong ' . $pamong->jabatan->nama . ' sudah tersedia, silahakan non-aktifkan terlebih dahulu jika ingin menggantinya.');
         }
 
@@ -542,15 +545,24 @@ class Pamong_model extends CI_Model
             $data['struktur'][] = [$pamong['atasan'] => $pamong['pamong_id']];
         }
 
-        $data['nodes'] = $this->db
-            ->select('p.pamong_id, rj.nama AS jabatan, p.bagan_tingkat, p.bagan_offset, p.bagan_layout, p.bagan_warna')
+        $data_query = $this->db
+            ->select('p.pamong_id, rj.nama AS jabatan, p.gelar_depan, p.gelar_belakang, p.bagan_tingkat, p.bagan_offset, p.bagan_layout, p.bagan_warna')
             ->select('(CASE WHEN id_pend IS NOT NULL THEN ph.foto ELSE p.foto END) as foto')
             ->select('(CASE WHEN id_pend IS NOT NULL THEN ph.nama ELSE p.pamong_nama END) as nama')
+            ->select('(CASE WHEN id_pend IS NOT NULL THEN ph.sex ELSE p.pamong_sex END) as jenis_kelamin')
             ->from('tweb_desa_pamong p')
             ->join('penduduk_hidup ph', 'ph.id = p.id_pend', 'left')
             ->join('ref_jabatan rj', 'rj.id = p.jabatan_id', 'left')
             ->where('pamong_status', 1)
-            ->get()->result_array();
+            ->get()
+            ->result_array();
+
+        $data['nodes'] = collect($data_query)->map(static function ($item) {
+            $item['nama'] = gelar($item['gelar_depan'], $item['nama'], $item['gelar_belakang']);
+
+            return $item;
+        })
+            ->toArray();
 
         return $data;
     }

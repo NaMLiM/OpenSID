@@ -39,13 +39,12 @@ use App\Models\Artikel;
 use App\Models\BantuanPeserta;
 use App\Models\Config;
 use App\Models\Dokumen;
+use App\Models\Keluarga;
 use App\Models\LogSurat;
 use App\Models\Penduduk;
 use App\Models\PendudukMandiri;
 use App\Models\Persil;
 use App\Models\User;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ClientException;
 
 defined('BASEPATH') || exit('No direct script access allowed');
 
@@ -136,6 +135,7 @@ class Track_model extends CI_Model
             'jml_unsur_peta'      => $this->jml_unsur_peta(),
             'jml_persil'          => Persil::count(),
             'jml_dokumen'         => Dokumen::hidup()->count(),
+            'jml_keluarga'        => Keluarga::status()->count(),
             'jml_surat_tte'       => LogSurat::whereNull('deleted_at')->where('tte', '=', 1)->count(), // jumlah surat terverifikasi secara tte
             'modul_tte'           => (LogSurat::whereNull('deleted_at')->where('tte', '=', 1)->count() > 0 && setting('tte') == 1) ? 1 : 0, // cek modul tte
         ];
@@ -144,25 +144,8 @@ class Track_model extends CI_Model
             return;
         }
 
-        try {
-            $response = (new Client())->post("{$tracker}/api/track/desa", [
-                'headers' => [
-                    'X-Requested-With' => 'XMLHttpRequest',
-                    'Authorization'    => 'Bearer ' . config_item('token_pantau'),
-                ],
-                'form_params' => $desa,
-            ]);
-        } catch (ClientException $cx) {
-            log_message('error', $cx);
-
-            return;
-        } catch (Exception $e) {
-            log_message('error', $e);
-
-            return;
-        }
-
-        $this->cek_notifikasi_TrackSID($response->getBody()->getContents());
+        $trackSID_output = httpPost($tracker . '/api/track/desa?token=' . config_item('token_pantau'), $desa); // kirim ke tracksid.
+        $this->cek_notifikasi_TrackSID($trackSID_output);
 
         if (strpos(current_url(), 'first') !== false) {
             $this->session->set_userdata('track_web', date('Y m d'));

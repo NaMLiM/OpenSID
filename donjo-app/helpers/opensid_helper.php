@@ -35,6 +35,9 @@
  *
  */
 
+use App\Models\RefJabatan;
+use GuzzleHttp\Client;
+
 defined('BASEPATH') || exit('No direct script access allowed');
 
 /**
@@ -42,7 +45,7 @@ defined('BASEPATH') || exit('No direct script access allowed');
  * Format => [dua digit tahun dan dua digit bulan].[nomor urut digit beta].[nomor urut digit bugfix]
  * Untuk rilis resmi (tgl 1 tiap bulan) dimulai dari 0 (beta) dan 0 (bugfix)
  */
-define('VERSION', '2306.0.0');
+define('VERSION', '2310.0.0');
 
 /**
  * VERSI_DATABASE
@@ -51,7 +54,7 @@ define('VERSION', '2306.0.0');
  * Versi database = [yyyymmdd][nomor urut dua digit]
  * [nomor urut dua digit] : 01 => rilis umum, 51 => rilis bugfix, 71 => rilis premium,
  */
-define('VERSI_DATABASE', '2023060101');
+define('VERSI_DATABASE', '2023100101');
 
 // Kode laporan statistik
 define('JUMLAH', 666);
@@ -132,6 +135,9 @@ define('NILAI_PENDAPAT', serialize([
     3 => 'Cukup',
     4 => 'Buruk',
 ]));
+
+use GuzzleHttp\Exception\ClientException;
+use voku\helper\AntiXSS;
 
 /**
  * Ambil Versi
@@ -219,49 +225,27 @@ function session_success()
 // Untuk mengirim data ke OpenSID tracker
 function httpPost($url, $params)
 {
-    if (! extension_loaded('curl') || isset($_SESSION['no_curl'])) {
-        log_message('error', 'curl tidak bisa dijalankan 1.' . $_SESSION['no_curl'] . ' 2.' . extension_loaded('curl'));
+    try {
+        $response = (new Client())->post($url, [
+            'headers' => [
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Authorization'    => 'Bearer ' . config_item('token_pantau'),
+            ],
+            'form_params'     => $params,
+            'timeout'         => 5,
+            'connect_timeout' => 4,
+        ]);
+    } catch (ClientException $cx) {
+        log_message('error', $cx);
+
+        return;
+    } catch (Exception $e) {
+        log_message('error', $e);
 
         return;
     }
 
-    $postData = '';
-    //create name value pairs seperated by &
-    foreach ($params as $k => $v) {
-        $postData .= $k . '=' . $v . '&';
-    }
-    $postData = rtrim($postData, '&');
-
-    try {
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HEADER, false);
-        curl_setopt($ch, CURLOPT_POST, count($postData));
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-
-        // Batasi waktu koneksi dan ambil data, supaya tidak menggantung kalau ada error koneksi
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-
-        /*curl_setopt($ch, CURLOPT_FORBID_REUSE, true);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
-        curl_setopt($ch, CURLOPT_DNS_CACHE_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_FRESH_CONNECT, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 1);*/
-        $output = curl_exec($ch);
-
-        if ($output === false) {
-            log_message('error', 'Curl error: ' . curl_error($ch));
-            log_message('error', print_r(curl_getinfo($ch), true));
-        }
-        curl_close($ch);
-
-        return $output;
-    } catch (Exception $e) {
-        return $e;
-    }
+    return $response->getBody()->getContents();
 }
 
 /**
@@ -533,10 +517,17 @@ function ambilBerkas($nama_berkas, $redirect_url = null, $unique_id = null, $lok
     $CI = &get_instance();
     $CI->load->helper('download');
 
-    // Batasi akses LOKASI_ARSIP hanya untuk admin
-    // if ($lokasi == LOKASI_ARSIP && $CI->session->siteman != 1) {
-    //     redirect('/');
-    // }
+    if (! preg_match('/^(?:[a-z0-9_-]|\.(?!\.))+$/iD', $nama_berkas)) {
+        $pesan = 'Nama berkas tidak valid';
+        session_error($pesan);
+        set_session('error', $pesan);
+
+        if ($redirect_url) {
+            redirect($redirect_url);
+        } else {
+            show_404();
+        }
+    }
 
     // Tentukan path berkas (absolut)
     $pathBerkas = FCPATH . $lokasi . $nama_berkas;
@@ -552,8 +543,6 @@ function ambilBerkas($nama_berkas, $redirect_url = null, $unique_id = null, $lok
         }
     }
     // OK, berkas ada. Ambil konten berkasnya
-
-    $data = file_get_contents($pathBerkas);
 
     if (null !== $unique_id) {
         // Buang unique id pada nama berkas download
@@ -602,13 +591,13 @@ function ambilBerkas($nama_berkas, $redirect_url = null, $unique_id = null, $lok
         header('Content-Disposition: inline; filename="' . $nama_berkas . '"');
         header('Expires: 0');
         header('Content-Transfer-Encoding: binary');
-        header('Content-Length: ' . strlen($data));
+        header('Content-Length: ' . filesize($pathBerkas));
         header('Cache-Control: private, no-transform, no-store, must-revalidate');
 
         return readfile($pathBerkas);
     }
 
-    force_download($nama_berkas, $data);
+    force_download($nama_berkas, file_get_contents($pathBerkas));
 }
 
 /**
@@ -823,7 +812,7 @@ function nama($str)
 
 function nama_desa($str)
 {
-    return preg_replace("/[^a-zA-Z '\\.,`\\-]/", '', strip_tags($str));
+    return preg_replace("/[^a-zA-Z '\\.,`\\-\\/\\(\\)]/", '', strip_tags($str));
 }
 
 // Cek  nama hanya boleh berisi karakter alpha, spasi, titik, koma, tanda petik dan strip
@@ -836,6 +825,18 @@ function cekNama($str)
 function nama_terbatas($str)
 {
     return preg_replace('/[^a-zA-Z0-9 \\-]/', '', $str);
+}
+
+// Judul hanya boleh berisi a-zA-Z0-9()[]&_:=°%'".,/ \-
+function judul($str)
+{
+    return preg_replace('/[^a-zA-Z0-9()[]&_:;=°%\'".,\\/ \\-]/', '', strip_tags($str));
+}
+
+// Nama surat hanya boleh berisi karakter alfanumerik, spasi, strip, (, )
+function nama_surat($str)
+{
+    return preg_replace('/[^a-zA-Z0-9 \\-\\(\\)]/', '', $str);
 }
 
 // Alamat hanya boleh berisi karakter alpha, numerik, spasi, titik, koma, tanda petik, strip dan garis miring
@@ -1279,21 +1280,18 @@ function idm($kode_desa, $tahun)
 
 function sdgs()
 {
-    $kode_desa      = setting('kode_desa_bps');
-    $kode_kecamatan = substr($kode_desa, 0, 6);
-    $kode_kabupaten = substr($kode_desa, 0, 4);
-    $kode_provinsi  = substr($kode_desa, 0, 2);
-    $cache          = 'sdgs_' . $kode_desa . '.json';
+    $kode_desa = setting('kode_desa_bps');
+    $cache     = 'sdgs_' . $kode_desa . '.json';
 
     if (! empty($kode_desa)) {
-        return get_instance()->cache->pakai_cache(static function () use ($kode_provinsi, $kode_kabupaten, $kode_kecamatan, $kode_desa) {
+        return get_instance()->cache->pakai_cache(static function () use ($kode_desa) {
             if (! cek_koneksi_internet()) {
                 return (object) ['error_msg' => 'Periksa koneksi internet Anda.'];
             }
 
             try {
                 $client   = new \GuzzleHttp\Client();
-                $response = $client->get(config_item('api_sdgs') . "province_code={$kode_provinsi}&city_code={$kode_kabupaten}&district_code={$kode_kecamatan}&village_code={$kode_desa}", [
+                $response = $client->get(config_item('api_sdgs') . $kode_desa, [
                     'headers' => [
                         'X-Requested-With' => 'XMLHttpRequest',
                     ],
@@ -1446,4 +1444,113 @@ function kasus_lain($kategori = null, $str = null)
     }
 
     return str_ireplace($daftar_ganti, array_map('strtoupper', $daftar_ganti), $str);
+}
+
+if (! function_exists('encrypt')) {
+    /**
+     * - Fungsi untuk encrypt string.
+     *
+     * @param string $str
+     *
+     * @return string
+     */
+    function encrypt($str = '')
+    {
+        $CI = &get_instance();
+        $CI->load->library('encryption');
+
+        $result = $CI->encryption->encrypt($str);
+
+        $result = strtr(
+            $result,
+            [
+                '+' => '.',
+                '=' => '-',
+                '/' => '~',
+            ]
+        );
+
+        return $result;
+    }
+}
+
+if (! function_exists('decrypt')) {
+    /**
+     * - Fungsi untuk decrypt string.
+     *
+     * @param string $str
+     *
+     * @return string
+     */
+    function decrypt($str = '')
+    {
+        $CI = &get_instance();
+        $CI->load->library('encryption');
+
+        $str = strtr(
+            $str,
+            [
+                '.' => '+',
+                '-' => '=',
+                '~' => '/',
+            ]
+        );
+
+        $result = $CI->encryption->decrypt($str);
+
+        return $result;
+    }
+}
+
+if (! function_exists('form_kode_isian')) {
+    /**
+     * - Fungsi untuk bersihkan kode isian.
+     *
+     * @param string $str
+     *
+     * @return string
+     */
+    function form_kode_isian($str)
+    {
+        return '[form_' . preg_replace('/\s+/', '_', preg_replace('/[^A-Za-z0-9& ]/', '', strtolower($str))) . ']';
+    }
+}
+
+if (! function_exists('kades')) {
+    /**
+     * - Fungsi untuk mengambil data jabatan kades.
+     *
+     * @return array|object
+     */
+    function kades()
+    {
+        return RefJabatan::getKades();
+    }
+}
+
+if (! function_exists('sekdes')) {
+    /**
+     * - Fungsi untuk mengambil data jabatan sekdes.
+     *
+     * @return array|object
+     */
+    function sekdes()
+    {
+        return RefJabatan::getSekdes();
+    }
+}
+
+/**
+ * @param string
+ *
+ * @return string
+ */
+if (! function_exists('bersihkan_xss')) {
+    function bersihkan_xss($str)
+    {
+        $antiXSS = new AntiXSS();
+        $antiXSS->removeEvilHtmlTags(['iframe']);
+
+        return $antiXSS->xss_clean($str);
+    }
 }

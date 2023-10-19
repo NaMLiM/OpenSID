@@ -35,6 +35,7 @@
  *
  */
 
+use App\Enums\SHDKEnum;
 use App\Enums\StatusEnum;
 use App\Libraries\TinyMCE;
 use App\Models\Config;
@@ -63,8 +64,8 @@ class Surat_master extends Admin_Controller
         parent::__construct();
         $this->load->model(['surat_master_model', 'lapor_model']);
         $this->tinymce       = new TinyMCE();
-        $this->modul_ini     = 4;
-        $this->sub_modul_ini = 30;
+        $this->modul_ini     = 'layanan-surat';
+        $this->sub_modul_ini = 'pengaturan-surat';
     }
 
     public function index()
@@ -124,6 +125,8 @@ class Surat_master extends Admin_Controller
     {
         $this->redirect_hak_akses('u');
 
+        $this->set_hak_akses_rfm();
+
         if ($id) {
             $suratMaster = FormatSurat::findOrFail($id);
 
@@ -169,6 +172,7 @@ class Surat_master extends Admin_Controller
         return [
             'daftar_jenis_kelamin' => Sex::pluck('nama', 'id'),
             'daftar_status_dasar'  => StatusDasar::pluck('nama', 'id'),
+            'daftar_shdk'          => SHDKEnum::all(),
         ];
     }
 
@@ -199,7 +203,7 @@ class Surat_master extends Admin_Controller
             $this->preview();
         }
 
-        if (FormatSurat::insert(static::validate($this->request))) {
+        if (FormatSurat::create(static::validate($this->request))) {
             redirect_with('success', 'Berhasil Tambah Data');
         }
 
@@ -252,7 +256,7 @@ class Surat_master extends Admin_Controller
 
             $kodeIsian[] = [
                 'tipe'      => $request['tipe_kode'][$i],
-                'kode'      => '[form_' . str_replace(' ', '_', strtolower($request['nama_kode'][$i])) . ']',
+                'kode'      => form_kode_isian($request['nama_kode'][$i]),
                 'nama'      => $request['nama_kode'][$i],
                 'deskripsi' => $request['deskripsi_kode'][$i],
                 'atribut'   => $request['atribut_kode'][$i],
@@ -263,6 +267,7 @@ class Surat_master extends Admin_Controller
             'individu' => [
                 'sex'          => $request['individu_sex'] ?? null,
                 'status_dasar' => $request['individu_status_dasar'] ?? null,
+                'kk_level'     => $request['individu_kk_level'] ?? null,
             ],
         ];
 
@@ -276,6 +281,7 @@ class Surat_master extends Admin_Controller
             'syarat_surat'        => $request['mandiri'] ? json_encode($request['id_cb']) : null,
             'qr_code'             => $request['qr_code'],
             'logo_garuda'         => $request['logo_garuda'],
+            'kecamatan'           => (int) ((setting('tte') == StatusEnum::YA) ? $request['kecamatan'] : 0),
             'template_desa'       => $request['template_desa'],
             'form_isian'          => json_encode($formIsian),
             'kode_isian'          => json_encode($kodeIsian),
@@ -388,7 +394,7 @@ class Surat_master extends Admin_Controller
                         $data['nama']      = ucwords(trim(str_replace(['surat_', '_'], ' ', $surat_baru)));
                         $data['url_surat'] = $surat_baru;
 
-                        FormatSurat::insert($data);
+                        FormatSurat::create($data);
                     }
 
                     $daftarSurat[] = $url_surat;
@@ -407,10 +413,10 @@ class Surat_master extends Admin_Controller
         $data['font_option'] = SettingAplikasi::where('key', '=', 'font_surat')->first()->option;
         $data['tte_demo']    = empty($this->setting->tte_api) || get_domain($this->setting->tte_api) === get_domain(APP_URL);
         $data['kades']       = User::where('active', '=', 1)->whereHas('pamong', static function ($query) {
-            return $query->where('jabatan_id', '=', '1');
+            return $query->where('jabatan_id', '=', kades()->id);
         })->exists();
         $data['sekdes'] = User::where('active', '=', 1)->whereHas('pamong', static function ($query) {
-            return $query->where('jabatan_id', '=', '2');
+            return $query->where('jabatan_id', '=', sekdes()->id);
         })->exists();
 
         $data['ref_jabatan'] = RefJabatan::all();
@@ -499,6 +505,7 @@ class Surat_master extends Admin_Controller
         $data['id_pend'] = Penduduk::filters([
             'sex'          => $this->request['individu_sex'],
             'status_dasar' => $this->request['individu_status_dasar'],
+            'kk_level'     => $this->request['individu_kk_level'],
         ])->first('id')
         ->id;
 
@@ -507,11 +514,11 @@ class Surat_master extends Admin_Controller
         }
 
         foreach ($this->request['nama_kode'] as $kode) {
-            $data = case_replace('[form_' . str_replace(' ', '_', strtolower($kode)) . ']', 'Masukkan ' . $kode, $data);
+            $data = case_replace(form_kode_isian($kode), 'Masukkan ' . $kode, $data);
         }
 
         $data      = str_replace('[JUdul_surat]', strtoupper($this->request['nama']), $data);
-        $isi_surat = $this->replceKodeIsian($data);
+        $isi_surat = $this->tinymce->replceKodeIsian($data);
 
         // Pisahkan isian surat
         $isi_surat  = str_replace('<p><!-- pagebreak --></p>', '', $isi_surat);
@@ -561,29 +568,6 @@ class Surat_master extends Admin_Controller
         }
 
         exit();
-    }
-
-    private function replceKodeIsian($data = [], $kecuali = [])
-    {
-        $result = $data['isi_surat'];
-
-        $kodeIsian = $this->tinymce->getFormatedKodeIsian($data, true);
-
-        if ((int) $data['surat']['masa_berlaku'] == 0) {
-            $result = str_replace('[mulai_berlaku] s/d [berlaku_sampai]', '-', $result);
-        }
-
-        foreach ($kodeIsian as $key => $value) {
-            if (in_array($key, $kecuali)) {
-                $result = $result;
-            } elseif (in_array($key, ['[atas_nama]', '[format_nomor_surat]'])) {
-                $result = str_replace($key, $value, $result);
-            } else {
-                $result = case_replace($key, $value, $result);
-            }
-        }
-
-        return $result;
     }
 
     public function ekspor()

@@ -121,13 +121,13 @@ class Keluar_model extends CI_Model
     {
         $isAdmin = $this->session->isAdmin->pamong;
         if (isset($this->session->masuk)) {
-            if ($isAdmin->jabatan_id == 1) {
+            if ($isAdmin->jabatan_id == kades()->id) {
                 if (setting('tte') == 1) {
                     $this->db->where('verifikasi_kades', '0')->or_where('tte', '0');
                 } else {
                     $this->db->where('verifikasi_kades', '0');
                 }
-            } elseif ($isAdmin->jabatan_id == 2) {
+            } elseif ($isAdmin->jabatan_id == sekdes()->id) {
                 $this->db->where('verifikasi_sekdes', '0');
             } else {
                 $this->db->where('verifikasi_operator', '0');
@@ -136,13 +136,13 @@ class Keluar_model extends CI_Model
             $this->db->where('verifikasi_operator', '-1');
         } else {
             $isAdmin = $this->session->isAdmin->pamong;
-            if ($isAdmin->jabatan_id == 1 && setting('verifikasi_kades') == 1) {
+            if ($isAdmin->jabatan_id == kades()->id && setting('verifikasi_kades') == 1) {
                 $this->db->where('verifikasi_kades', '1')
                     ->or_group_start()
                     ->where('verifikasi_operator')
                     ->where('verifikasi_sekdes')
                     ->group_end();
-            } elseif ($isAdmin->jabatan_id == 2 && setting('verifikasi_sekdes') == 1) {
+            } elseif ($isAdmin->jabatan_id == sekdes()->id && setting('verifikasi_sekdes') == 1) {
                 $this->db->where('verifikasi_sekdes', '1')->or_where('verifikasi_operator');
             } else {
                 $this->db->where('verifikasi_operator', '1')->or_where('verifikasi_operator');
@@ -154,14 +154,14 @@ class Keluar_model extends CI_Model
     {
         // jika kepdesa
         $isAdmin = $this->session->isAdmin->pamong;
-        if ($isAdmin->jabatan_id == 1 && setting('verifikasi_kades') == 1) {
+        if ($isAdmin->jabatan_id == kades()->id && setting('verifikasi_kades') == 1) {
             $this->db->group_start()
                 ->where_in('verifikasi_kades', ['1', '0'])
                 ->group_end();
             $this->db->select('verifikasi_kades as verifikasi');
             $raw_status_periksa = 'CASE when verifikasi_kades = 1 THEN IF(tte is null,verifikasi_kades,2) ELSE 0 end AS status_periksa';
             $this->db->select($raw_status_periksa);
-        } elseif ($isAdmin->jabatan_id == 2 && setting('verifikasi_sekdes') == 1) {
+        } elseif ($isAdmin->jabatan_id == sekdes()->id && setting('verifikasi_sekdes') == 1) {
             $this->db->group_start()
                 ->where_in('verifikasi_sekdes', ['1', '0'])
                 ->or_where('verifikasi_operator')
@@ -257,7 +257,7 @@ class Keluar_model extends CI_Model
         // TODO : Sederhanakan, ini berulang
         $this->db
             ->select('u.*, n.nama AS nama, w.nama AS nama_user, n.nik AS nik, k.nama AS format, k.url_surat as berkas, k.kode_surat as kode_surat, s.id_pend as pamong_id_pend, s.gelar_depan, s.gelar_belakang')
-            ->select('(case when p.nama is not null then p.nama else s.pamong_nama end) as pamong_nama')
+            ->select('u.nama_pamong as pamong_nama')
             ->select('k.url_surat, k.jenis')
             ->where('u.status !=', null)
             ->limit($limit, $offset);
@@ -279,8 +279,6 @@ class Keluar_model extends CI_Model
                     $this->rincian_file($data, $i);
                 }
             }
-
-            $data[$i]['pamong_nama'] = gelar($data[$i]['gelar_depan'], $data[$i]['pamong_nama'], $data[$i]['gelar_belakang']);
 
             $j++;
         }
@@ -543,8 +541,8 @@ class Keluar_model extends CI_Model
 
         // TODO : Sederhanakan, ini berulang
         $data = $this->db
-            ->select('l.*, k.nama AS perihal, k.kode_surat, n.nama AS nama_penduduk, r.nama AS pamong_jabatan')
-            ->select('(case when p.nama is not null then p.nama else s.pamong_nama end) as pamong_nama')
+            ->select('l.*, k.nama AS perihal, k.kode_surat, n.nama AS nama_penduduk, l.nama_jabatan AS pamong_jabatan')
+            ->select('nama_pamong as pamong_nama')
             ->from('log_surat l')
             ->join('tweb_penduduk n', 'l.id_pend = n.id', 'left')
             ->join('tweb_surat_format k', 'l.id_format_surat = k.id', 'left')
@@ -570,7 +568,17 @@ class Keluar_model extends CI_Model
 
         $data->nomor_surat = $this->penomoran_surat_model->format_penomoran_surat($format);
 
-        return $data;
+        // Filter Output
+        $output = [
+            'nomor_surat'    => $data->nomor_surat,
+            'tanggal'        => $data->tanggal,
+            'perihal'        => $data->perihal,
+            'nama_penduduk'  => $data->nama_penduduk ?? $data->nama_non_warga,
+            'pamong_nama'    => $data->pamong_nama,
+            'pamong_jabatan' => $data->pamong_jabatan,
+        ];
+
+        return (object) $output;
     }
 
     public function get_surat($id = 0)

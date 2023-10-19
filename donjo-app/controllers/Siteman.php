@@ -49,6 +49,7 @@ class Siteman extends MY_Controller
         $this->load->model('theme_model');
         $this->lang->load('passwords');
         $this->load->library('Reset/Password', '', 'password');
+        $this->latar_login = default_file(LATAR_LOGIN . $this->setting->latar_login, DEFAULT_LATAR_SITEMAN);
     }
 
     public function index()
@@ -67,12 +68,12 @@ class Siteman extends MY_Controller
         $data['header'] = Config::first();
 
         $data['form_action'] = site_url('siteman/auth');
+        $data['logo_bsre']   = default_file(LOGO_BSRE, false);
+        $data['latar_login'] = $this->latar_login;
         //Initialize Session ------------
         if (! isset($_SESSION['siteman'])) {
             // Belum ada session variable
             $this->session->set_userdata('siteman', 0);
-            $this->session->set_userdata('siteman_try', 4);
-            $this->session->set_userdata('siteman_wait', 0);
         }
         session_error_clear();
         $_SESSION['per_page']   = 10;
@@ -125,7 +126,8 @@ class Siteman extends MY_Controller
 
     public function lupa_sandi()
     {
-        $data['header'] = Config::first();
+        $data['header']      = Config::first();
+        $data['latar_login'] = $this->latar_login;
 
         $this->load->view('lupa_sandi', $data);
     }
@@ -133,10 +135,8 @@ class Siteman extends MY_Controller
     public function kirim_lupa_sandi()
     {
         // Periksa isian captcha
-        include FCPATH . 'securimage/securimage.php';
-        $securimage = new Securimage();
-
-        if (! $securimage->check($this->input->post('captcha_code'))) {
+        $captcha = new App\Libraries\Captcha();
+        if (! $captcha->check($this->input->post('captcha_code'))) {
             set_session('notif', 'Kode captcha anda salah. Silakan ulangi lagi.');
 
             redirect('siteman/lupa_sandi');
@@ -165,9 +165,10 @@ class Siteman extends MY_Controller
             redirect('siteman');
         }
 
-        $data['header'] = Config::first();
-        $data['email']  = $this->input->get('email', true);
-        $data['token']  = $token;
+        $data['header']      = Config::first();
+        $data['email']       = $this->input->get('email', true);
+        $data['token']       = $token;
+        $data['latar_login'] = $this->latar_login;
 
         $this->load->view('reset_kata_sandi', $data);
     }

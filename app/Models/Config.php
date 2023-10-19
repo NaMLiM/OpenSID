@@ -78,6 +78,7 @@ class Config extends BaseModel
         'alamat_kantor',
         'email_desa',
         'telepon',
+        'nomor_operator',
         'website',
         'kantor_desa',
         'warna',
@@ -93,6 +94,8 @@ class Config extends BaseModel
     protected $appends = [
         'nip_kepala_desa',
         'nama_kepala_desa',
+        'path_logo',
+        'path_kantor_desa',
     ];
 
     /**
@@ -118,5 +121,62 @@ class Config extends BaseModel
     public function pamong()
     {
         return Pamong::kepalaDesa()->first();
+    }
+
+    /**
+     * Getter untuk path + logo desa
+     *
+     * @return string
+     */
+    public function getPathLogoAttribute()
+    {
+        $logo = LOKASI_LOGO_DESA . $this->attributes['logo'];
+
+        if (empty($this->attributes['logo']) || ! file_exists(FCPATH . $logo)) {
+            return 'assets/files/logo/opensid_logo.png';
+        }
+
+        return $this->attributes['logo'];
+    }
+
+    /**
+     * Getter untuk path + kantor desa
+     *
+     * @return string
+     */
+    public function getPathKantorDesaAttribute()
+    {
+        $kantor_desa = LOKASI_LOGO_DESA . $this->attributes['kantor_desa'];
+
+        if (empty($this->attributes['kantor_desa']) || ! file_exists(FCPATH . $kantor_desa)) {
+            return 'assets/files/logo/opensid_kantor.jpg';
+        }
+
+        return $this->attributes['kantor_desa'];
+    }
+
+    /**
+     * The "booted" method of the model.
+     *
+     * @return void
+     */
+    public static function boot()
+    {
+        parent::boot();
+        static::creating(static function ($model) {
+            $model->app_key = get_app_key();
+        });
+
+        static::updating(static function ($model) {
+            static::clearCache();
+        });
+    }
+
+    // Hapus cache config dan modul
+    private static function clearCache()
+    {
+        // hapus_cache('identitas_desa');
+        hapus_cache('status_langganan');
+        hapus_cache('_cache_modul');
     }
 }

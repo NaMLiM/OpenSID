@@ -48,6 +48,19 @@
                             </select>
                         </td>
                     </tr>
+
+                    <tr>
+                        <td>Status Hubungan Dalam Keluarga (SHDK)</td>
+                        <td>
+                            <select class="form-control input-sm select2" name="individu_kk_level">
+                                <option value="">SEMUA</option>
+                                @foreach ($form_isian['daftar_shdk'] as $key => $data):
+                                    <option value="{{ $key }}" @selected($key == $suratMaster->form_isian->individu->kk_level)>{{ $data }}
+                                    </option>
+                                    <?php endforeach; ?>
+                            </select>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -66,7 +79,7 @@
                         <td>Aksi</td>
                     </tr>
                     @forelse ($suratMaster->kode_isian as $key => $value)
-                        <tr class="duplikasi" id="gandakan-{{ $key }}">
+                        <tr class="duplikasi" id="gandakan-{{ $key }}" data-id="{{ $key }}">
                             <td>
                                 <select class="form-control input-sm pilih_tipe" name="tipe_kode[]">
                                     @foreach ($attributes as $attr_key => $attr_value)
@@ -88,7 +101,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr class="duplikasi" id="gandakan-0">
+                        <tr class="duplikasi" id="gandakan-0" data-id="0">
                             <td>
                                 <select class="form-control input-sm pilih_tipe" name="tipe_kode[]">
                                     @foreach ($attributes as $attr_key => $attr_value)
@@ -122,31 +135,32 @@
 @push('scripts')
     <script>
         $(document).ready(function() {
-            $('#gandakan-0').find("button").hide();
-            var counter = $(".tambah-kode").data("counter");
-            var key = $("#gandakan-0").length;
+            var counter = $(".duplikasi:last").data("id");
+            $("#gandakan-" + counter).find("button").hide();
 
             $('.tambah-kode').on('click', function() {
                 var editElm;
                 counter++;
-                key++;
                 $("#gandakan-0").clone(true)
                     .map(function() {
                         editElm = $(this)
-                            .attr('id', 'gandakan-' + key)
+                            .attr('id', 'gandakan-' + counter)
+                            .attr('data-id', counter)
                             .find('select')
                             .end();
                     });
 
-                if ($("#gandakan-" + (key - 1)).length) {
-                    $("#gandakan-" + (key - 1)).after(editElm);
+                if ($("#gandakan-" + (counter - 1)).length) {
+                    $("#gandakan-" + (counter - 1)).after(editElm);
                 } else {
                     $("#gandakan-0").after(editElm);
                 }
-                $("#gandakan-" + key).find('input').val('');
+                $("#gandakan-" + counter).find('input').val('');
+                $("#gandakan-" + counter).find('select').change(0);
+                $("#gandakan-" + counter + " option:selected").removeAttr('selected');
 
                 $('.duplikasi').find("button").show();
-                $('#gandakan-0').find("button").hide();
+                $("#gandakan-" + counter).find("button").hide();
             });
 
             $('.hapus-kode').on('click', function() {

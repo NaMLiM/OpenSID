@@ -54,13 +54,13 @@ class Web extends Admin_Controller
 
         $this->load->model(['web_artikel_model', 'web_kategori_model']);
         $this->_set_page     = ['20', '50', '100'];
-        $this->modul_ini     = 13;
-        $this->sub_modul_ini = 47;
+        $this->modul_ini     = 'admin-web';
+        $this->sub_modul_ini = 'artikel';
     }
 
     public function clear()
     {
-        $this->session->unset_userdata(['cari, status']);
+        $this->session->unset_userdata(['cari', 'status']);
         $this->session->per_page = $this->_set_page[0];
         $this->session->kategori = -1;
         redirect('web');
@@ -91,7 +91,6 @@ class Web extends Admin_Controller
         $data['keyword']       = $this->web_artikel_model->autocomplete($cat);
         $data['list_kategori'] = $this->web_artikel_model->list_kategori();
         $data['kategori']      = $this->web_artikel_model->get_kategori($cat);
-        $data                  = $this->security->xss_clean($data);
         $data['paging']        = $paging;
 
         $this->render('web/artikel/table', $data);
@@ -106,7 +105,9 @@ class Web extends Admin_Controller
 
     public function form($id = 0)
     {
+        $id = decrypt($id);
         $this->redirect_hak_akses('u');
+        $this->set_hak_akses_rfm();
         $cat = $this->session->kategori ?: 0;
 
         if ($id) {
@@ -122,6 +123,7 @@ class Web extends Admin_Controller
             $this->session->kategori = $cek_data['id_kategori'];
             $data['artikel']         = $cek_data;
             $data['form_action']     = site_url("web/update/{$id}");
+            $data['id']              = $id;
         } else {
             $data['artikel']     = null;
             $data['form_action'] = site_url('web/insert');
@@ -173,7 +175,7 @@ class Web extends Admin_Controller
     public function delete($id = 0)
     {
         $this->redirect_hak_akses('h');
-        $this->web_artikel_model->delete($id);
+        $this->web_artikel_model->delete(decrypt($id));
         redirect('web');
     }
 
@@ -199,6 +201,7 @@ class Web extends Admin_Controller
     // TODO: Pindahkan ke controller kategoris
     public function ubah_kategori_form($id = 0)
     {
+        $id = decrypt($id);
         $this->redirect_hak_akses('u');
         if (! $this->web_artikel_model->boleh_ubah($id, $this->session->user)) {
             redirect('web');
@@ -228,7 +231,7 @@ class Web extends Admin_Controller
         // Kontributor tidak boleh mengubah status aktif artikel
         $this->redirect_hak_akses('u');
 
-        $this->web_artikel_model->artikel_lock($id, $val);
+        $this->web_artikel_model->artikel_lock(decrypt($id), $val);
         redirect('web');
     }
 
@@ -237,7 +240,7 @@ class Web extends Admin_Controller
         // Kontributor tidak boleh mengubah status komentar artikel
         $this->redirect_hak_akses('u');
 
-        $this->web_artikel_model->komentar_lock($id, $val);
+        $this->web_artikel_model->komentar_lock(decrypt($id), $val);
         redirect('web');
     }
 
@@ -262,7 +265,7 @@ class Web extends Admin_Controller
         // Kontributor tidak boleh melakukan ini
         $this->redirect_hak_akses('u');
 
-        $this->web_artikel_model->headline($id);
+        $this->web_artikel_model->headline(decrypt($id));
         redirect('web');
     }
 
@@ -271,13 +274,13 @@ class Web extends Admin_Controller
         // Kontributor tidak boleh melakukan ini
         $this->redirect_hak_akses('u');
 
-        $this->web_artikel_model->slide($id);
+        $this->web_artikel_model->slide(decrypt($id));
         redirect('web');
     }
 
     public function slider()
     {
-        $this->sub_modul_ini = 54;
+        $this->sub_modul_ini = 'slider';
 
         $this->render('slider/admin_slider.php');
     }
@@ -293,7 +296,7 @@ class Web extends Admin_Controller
 
     public function teks_berjalan()
     {
-        $this->sub_modul_ini = 64;
+        $this->sub_modul_ini = 'teks-berjalan';
 
         $this->render('web/admin_teks_berjalan.php');
     }

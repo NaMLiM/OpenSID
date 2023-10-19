@@ -43,8 +43,8 @@ class Setting extends Admin_Controller
     {
         parent::__construct();
         $this->load->model(['theme_model']);
-        $this->modul_ini     = 11;
-        $this->sub_modul_ini = 43;
+        $this->modul_ini     = 'pengaturan';
+        $this->sub_modul_ini = 'aplikasi';
     }
 
     public function index()
@@ -53,7 +53,8 @@ class Setting extends Admin_Controller
             'judul'               => 'Pengaturan Aplikasi',
             'pengaturan_kategori' => ['sistem', 'peta', 'web_theme', 'readonly', 'web', 'mobile'],
             'atur_latar'          => true,
-            'latar_website'       => $this->theme_model->latar_website(),
+            'latar_website'       => to_base64(default_file($this->theme_model->lokasi_latar_website() . $this->setting->latar_website, DEFAULT_LATAR_WEBSITE)),
+            'latar_siteman'       => to_base64(default_file(LATAR_LOGIN . $this->setting->latar_login, DEFAULT_LATAR_SITEMAN)),
         ];
 
         return view('admin.pengaturan.index', $data);
@@ -63,8 +64,8 @@ class Setting extends Admin_Controller
     public function update()
     {
         $this->redirect_hak_akses_url('u');
-        $this->setting_model->update_setting($this->input->post());
-        status_sukses(true, false, 'Berhasil Ubah Data');
+        $hasil = $this->setting_model->update_setting($this->input->post());
+        status_sukses($hasil, false, 'Berhasil Ubah Data');
 
         redirect($_SERVER['HTTP_REFERER']);
     }
@@ -73,8 +74,11 @@ class Setting extends Admin_Controller
     public function new_update()
     {
         $this->redirect_hak_akses_url('u');
-        $this->setting_model->update_setting($this->input->post());
-        set_session('success', 'Berhasil Ubah Data');
+        if ($this->setting_model->update_setting($this->input->post())) {
+            set_session('success', 'Berhasil Ubah Data');
+        } else {
+            set_session('error', 'Gagal Ubah Data. ' . session('flash_error_msg'));
+        }
 
         redirect($_SERVER['HTTP_REFERER']);
     }
@@ -91,8 +95,8 @@ class Setting extends Admin_Controller
     // Pengaturan web
     public function web()
     {
-        $this->modul_ini     = 13;
-        $this->sub_modul_ini = 211;
+        $this->modul_ini     = 'admin-web';
+        $this->sub_modul_ini = 'pengaturan-web';
 
         $data = [
             'judul'               => 'Pengaturan Halaman Web',
@@ -106,14 +110,15 @@ class Setting extends Admin_Controller
     // Pengaturan mandiri
     public function mandiri()
     {
-        $this->modul_ini     = 14;
-        $this->sub_modul_ini = 314;
+        $this->modul_ini     = 'layanan-mandiri';
+        $this->sub_modul_ini = 'pengaturan-layanan-mandiri';
 
         $data = [
             'judul'               => 'Pengaturan Layanan Mandiri',
             'pengaturan_kategori' => ['setting_mandiri'],
             'atur_latar'          => true,
             'aksi_controller'     => 'setting/mandiri',
+            'latar_mandiri'       => to_base64(default_file(LATAR_LOGIN . $this->setting->latar_login_mandiri, DEFAULT_LATAR_KEHADIRAN)),
         ];
 
         return view('admin.pengaturan.index', $data);
@@ -122,8 +127,8 @@ class Setting extends Admin_Controller
     // Pengaturan analisis
     public function analisis()
     {
-        $this->modul_ini     = 5;
-        $this->sub_modul_ini = 111;
+        $this->modul_ini     = 'analisis';
+        $this->sub_modul_ini = 'pengaturan-analisis';
 
         $data = [
             'judul'               => 'Pengaturan Analisis',
@@ -136,8 +141,8 @@ class Setting extends Admin_Controller
 
     public function qrcode($aksi = '')
     {
-        $this->modul_ini     = 11;
-        $this->sub_modul_ini = 212;
+        $this->modul_ini     = 'pengaturan';
+        $this->sub_modul_ini = 'qr-code';
 
         $data['qrcode']        = ['changeqr' => '1', 'sizeqr' => '6', 'foreqr' => '#000000']; // Default
         $data['list_changeqr'] = ['Otomatis (Logo Desa)', 'Manual'];

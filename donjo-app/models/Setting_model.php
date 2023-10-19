@@ -35,7 +35,7 @@
  *
  */
 
-use App\Models\RefJabatan;
+use App\Libraries\TinyMCE;
 use App\Models\SettingAplikasi;
 use Illuminate\Support\Facades\Schema;
 
@@ -52,6 +52,7 @@ define('EKSTENSI_WAJIB', serialize([
     'mysqlnd',
     'tidy',
     'zip',
+    'exif',
 ]));
 define('minPhpVersion', '7.3.0');
 define('maxPhpVersion', '8.0.0');
@@ -91,6 +92,18 @@ class Setting_model extends MY_Model
             $this->setting->mapbox_key = config_item('mapbox_key');
         }
 
+        if (empty($this->setting->header_surat)) {
+            $this->setting->header_surat = TinyMCE::HEADER;
+        }
+
+        if (empty($this->setting->footer_surat)) {
+            $this->setting->footer_surat = TinyMCE::FOOTER;
+        }
+
+        if (empty($this->setting->footer_surat_tte)) {
+            $this->setting->footer_surat_tte = TinyMCE::FOOTER_TTE;
+        }
+
         // Ganti token_layanan sesuai config untuk mempermudah development
         if ((ENVIRONMENT == 'development') || config_item('token_layanan')) {
             $this->setting->layanan_opendesa_token = config_item('token_layanan');
@@ -107,12 +120,12 @@ class Setting_model extends MY_Model
             }
         }
 
-        // Sebutan kepala desa diambil dari tabel ref_jabatan dengan id = 1
+        // Sebutan kepala desa diambil dari tabel ref_jabatan dengan jenis = 1
         // Diperlukan karena masih banyak yang menggunakan variabel ini, hapus jika tidak digunakan lagi
-        $this->setting->sebutan_kepala_desa = (Schema::hasTable('ref_jabatan')) ? RefJabatan::find(1)->nama : '';
+        $this->setting->sebutan_kepala_desa = Schema::hasTable('ref_jabatan') ? kades()->nama : null;
 
-        // Sebutan sekretaris desa diambil dari tabel ref_jabatan dengan id = 2
-        $this->setting->sebutan_sekretaris_desa = (Schema::hasTable('ref_jabatan')) ? RefJabatan::find(2)->nama : '';
+        // Sebutan sekretaris desa diambil dari tabel ref_jabatan dengan jenis = 2
+        $this->setting->sebutan_sekretaris_desa = Schema::hasTable('ref_jabatan') ? sekdes()->nama : null;
 
         $this->load->model('database_model');
         $this->database_model->cek_migrasi();
@@ -120,6 +133,33 @@ class Setting_model extends MY_Model
 
     public function update_setting($data)
     {
+        $hasil = true;
+
+        // TODO : Jika sudah dipisahkan, buat agar upload gambar dinamis/bisa menyesuaikan dengan kebutuhan tema (u/ Modul Pengaturan Tema)
+        if ($data['latar_website'] != '') {
+            $hasil = $hasil && $this->upload_img('latar_website', $this->theme_model->lokasi_latar_website(str_replace('desa/', '', $this->setting->web_theme)), $this->setting->latar_website);
+        }
+
+        if ($data['latar_login'] != '') {
+            $hasil = $hasil && $this->upload_img('latar_login', LATAR_LOGIN, $this->setting->latar_login);
+        }
+
+        if ($data['latar_login_mandiri'] != '') {
+            $hasil = $hasil && $this->upload_img('latar_login_mandiri', LATAR_LOGIN, $this->setting->latar_login_mandiri);
+        }
+
+        if ($this->setting->latar_website) {
+            $data['latar_website'] = $this->setting->latar_website;
+        }
+
+        if ($this->setting->latar_login) {
+            $data['latar_login'] = $this->setting->latar_login;
+        }
+
+        if ($this->setting->latar_login_mandiri) {
+            $data['latar_login_mandiri'] = $this->setting->latar_login_mandiri;
+        }
+
         foreach ($data as $key => $value) {
             // Update setting yang diubah
             if ($this->setting->{$key} != $value) {
@@ -141,47 +181,48 @@ class Setting_model extends MY_Model
                     $value = null;
                 }
 
-                $this->update($key, $value);
+                $hasil                 = $hasil && $this->update($key, $value);
                 $this->setting->{$key} = $value;
                 if ($key == 'enable_track') {
-                    $this->notifikasi_tracker();
+                    $hasil = $hasil && $this->notifikasi_tracker();
                 }
             }
         }
         $this->apply_setting();
-        // TODO : Jika sudah dipisahkan, buat agar upload gambar dinamis/bisa menyesuaikan dengan kebutuhan tema (u/ Modul Pengaturan Tema)
-        if ($data['latar_website'] != '') {
-            $this->upload_img('latar_website', $this->theme_model->lokasi_latar_website(str_replace('desa/', '', $this->setting->web_theme)));
-        } // latar_website
-        if ($data['latar_login'] != '') {
-            $this->upload_img('latar_login', LATAR_LOGIN);
-        } // latar_login
-        if ($data['latar_login_mandiri'] != '') {
-            $this->upload_img('latar_login_mandiri', LATAR_LOGIN);
-        } // latar_login_mandiri
 
-        return $data;
+        return $hasil;
     }
 
-    public function upload_img($key = '', $lokasi = '')
+    public function upload_img($key = '', $lokasi = '', $latar_old = '')
     {
-        $this->load->library('upload');
+        $this->load->library('MY_Upload', null, 'upload');
 
         $config['upload_path']   = $lokasi;
         $config['allowed_types'] = 'jpg|jpeg|png';
         $config['overwrite']     = true;
         $config['max_size']      = max_upload() * 1024;
-        $config['file_name']     = $key . '.jpg';
+        $config['file_name']     = time() . $key . '.jpg';
+        $data['value']           = $config['file_name'];
 
         $this->upload->initialize($config);
 
         if ($this->upload->do_upload($key)) {
             $this->upload->data();
 
-            return $lokasi . $config['file_name'];
+            if ($latar_old) {
+                unlink($lokasi . $latar_old); // hapus file yang sebelumya
+            }
+
+            if ($key . '.jpg') {
+                unlink($lokasi . $key . '.jpg'); // hapus file yang sebelumya
+            }
+
+            $this->db->where('key', $key)->update('setting_aplikasi', $data); // simpan ke database
+
+            return $lokasi . $config['file_name']; // simpan ke path
         }
 
-        session_error($this->upload->display_errors());
+        set_session('flash_error_msg', $this->upload->display_errors(null, null));
 
         return false;
     }
@@ -203,12 +244,14 @@ class Setting_model extends MY_Model
             ];
         }
         $this->db->where('kode', 'tracking_off')->update('notifikasi', $notif);
+
+        return true;
     }
 
     public function update($key = 'enable_track', $value = 1)
     {
         if (in_array($key, ['latar_kehadiran'])) {
-            $value = $this->upload_img('latar_kehadiran', LATAR_LOGIN);
+            $value = $this->upload_img('latar_kehadiran', LATAR_LOGIN, null);
         }
 
         if ($key == 'tte' && $value == 1) {
@@ -223,6 +266,8 @@ class Setting_model extends MY_Model
         $this->cache->hapus_cache_untuk_semua('_cache_modul');
 
         status_sukses($outp);
+
+        return true;
     }
 
     public function aktifkan_tracking()
